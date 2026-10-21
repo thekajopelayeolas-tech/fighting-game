@@ -18,6 +18,7 @@ const CONFIG = {
     sniper: 'assets/weapons/sniper.png',
     knife: 'assets/weapons/knife.png',
     crab: 'assets/sprites/invader_crab.png',
+    redCrab: 'assets/sprites/red_crab.png',
     meteor: 'assets/sprites/space_meteor_large.png',
     coin: 'assets/sprites/spinning_coin.png',
     space: 'assets/backgrounds/space.png',
@@ -44,10 +45,10 @@ const CONFIG = {
     knife: { name: 'Knife', damage: 18, cooldown: 0.25, range: 58, arc: 1.2, image: 'knife', scale: 0.1, color: '#adb5bd', melee: true },
   },
   enemies: {
-    slime: { name: 'Slime', health: 30, speed: 70, damage: 1, radius: 14, color: '#06d6a0', score: 10, xp: 1 },
+    slime: { name: 'Slime', health: 30, speed: 70, damage: 1, radius: 14, color: '#06d6a0', score: 10, xp: 1, sprite: { image: 'redCrab', frames: 5, frameSize: 48 } },
     bat: { name: 'Bat', health: 18, speed: 120, damage: 1, radius: 11, color: '#9d4edd', score: 15, xp: 1, sprite: { image: 'crab', frames: 5, frameSize: 48 } },
     brute: { name: 'Brute', health: 120, speed: 45, damage: 2, radius: 24, color: '#e63946', score: 40, xp: 3, sprite: { image: 'meteor', frames: 1, frameSize: 64 } },
-    boss: { name: 'Overlord', health: 900, speed: 55, damage: 2, radius: 46, color: '#ff006e', score: 500, xp: 15 },
+    boss: { name: 'Overlord', health: 900, speed: 55, damage: 2, radius: 46, color: '#ff006e', score: 500, xp: 15, sprite: { image: 'redCrab', frames: 5, frameSize: 48 } },
   },
   powerUps: {
     shield: { name: 'Shield', duration: 6, color: '#4cc9f0', icon: 'S' },
