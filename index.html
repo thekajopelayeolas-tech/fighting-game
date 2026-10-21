@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Survival Arena</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="stage">
+    <canvas id="game"></canvas>
+    <div id="hud" class="hud"></div>
+
+    <div id="title" class="overlay">
+      <div class="title-card">
+        <h1 class="title-text">SURVIVAL ARENA</h1>
+        <p class="subtitle">Blast slimes. Buy gear. Outlast the Overlord.</p>
+        <div class="btn-row">
+          <button id="start-btn" class="big-btn">1 PLAYER</button>
+          <button id="start-coop-btn" class="big-btn coop">2 PLAYERS</button>
+          <button id="start-pvp-btn" class="big-btn pvp">PVP VERSUS</button>
+        </div>
+        <p class="hint">PvP: first to 3 round wins. Hit your rival to earn coins. Each player has their own shop.</p>
+        <button id="howto-btn" class="big-btn howto">HOW TO PLAY</button>
+      </div>
+    </div>
+
+    <div id="howto" class="overlay hidden">
+      <div class="howto-card">
+        <h2>HOW TO PLAY</h2>
+        <div class="howto-grid">
+          <section>
+            <h3>Goal</h3>
+            <p>Survive waves of slimes, bats, and brutes. Every 5th wave brings the Overlord boss. Between waves, the shop opens.</p>
+            <p>PvP: fight your rival. Hit them to earn coins. The first to 3 round wins takes the match.</p>
+          </section>
+          <section>
+            <h3>Controls: Player 1</h3>
+            <p>WASD move &middot; Mouse aims &middot; Space or click fires &middot; E picks up or revives &middot; 1-9 switch weapon</p>
+            <h3>Controls: Player 2</h3>
+            <p>Arrow keys move &middot; Auto-aims &middot; Right Shift fires &middot; Right Ctrl picks up or revives &middot; Numpad 0 switches weapon</p>
+            <h3>Other</h3>
+            <p>P or Esc pauses &middot; M mutes</p>
+          </section>
+          <section>
+            <h3>Pickups</h3>
+            <p>Ammo, healing, and new weapons drop from enemies. Walk over one and press E.</p>
+            <p>Power-ups (Shield, Rage, Haste) activate automatically when you walk over them.</p>
+            <h3>Weapons</h3>
+            <p>Assault Rifle, Sniper (pierces), Shotgun, Sword, and Knife. Buy them in the shop.</p>
+          </section>
+        </div>
+        <button id="howto-back" class="big-btn back">BACK</button>
+      </div>
+    </div>
+
+    <div id="select" class="overlay hidden">
+      <div class="select-card">
+        <h2>CHOOSE YOUR CHARACTER</h2>
+        <div id="select-slots" class="select-slots"></div>
+        <div id="select-grid" class="select-grid"></div>
+        <p id="select-status" class="hint"></p>
+        <div class="btn-row">
+          <button id="select-back" class="big-btn back">BACK</button>
+          <button id="select-start" class="big-btn" disabled>START</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="shop" class="overlay hidden">
+      <div class="shop-card">
+        <h2>SHOP <span class="coins">Coins: <span id="shop-coins">0</span></span></h2>
+        <div id="shop-tabs" class="shop-tabs"></div>
+        <h3>Upgrades</h3>
+        <div id="shop-upgrades" class="shop-grid"></div>
+        <h3>Weapons</h3>
+        <div id="shop-weapons" class="shop-grid"></div>
+        <button id="next-wave-btn" class="big-btn">NEXT WAVE</button>
+      </div>
+    </div>
+
+    <div id="gameover" class="overlay hidden">
+      <div class="title-card">
+        <h1 id="gameover-title" class="title-text over">GAME OVER</h1>
+        <p><span id="final-score-label">Score</span> <strong id="final-score">0</strong> &middot; <span id="final-wave-label">Wave</span> <strong id="final-wave">0</strong></p>
+        <p><span id="final-best-label">Best</span> <strong id="final-best">0</strong></p>
+        <button id="retry-btn" class="big-btn">PLAY AGAIN</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

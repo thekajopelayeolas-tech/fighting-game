@@ -1,0 +1,12 @@
+{
+  "name": "survival-arena",
+  "version": "1.0.0",
+  "description": "A browser survival shooter with weapons, shops, and power-ups",
+  "main": "index.html",
+  "scripts": {
+    "test": "node --test tests/game.test.js tests/shop.test.js tests/powerups.test.js tests/smoke.test.js tests/assets.test.js tests/coop.test.js tests/pvp.test.js tests/movement.test.js tests/howto.test.js",
+    "check": "node --check js/config.js && node --check js/audio.js && node --check js/game.js && node --check js/render.js && node --check js/main.js"
+  },
+  "license": "UNLICENSED",
+  "private": true
+}
