@@ -1,0 +1,14 @@
+Made with Reactify Asset Studio
+
+You can use these assets in your own games. Thank you to the artists:
+
+Reactify (made with PixelLab) – free to use in your games
+  Space World Tiles, Space World Background, Spinning Coin, Invader Crab
+Reactify (made with ElevenLabs) – free to use in your games
+  Dash Whoosh, Space Adventure Music
+Kenney (kenney.nl) – CC0
+  Jump 1, Coin Pickup, Laser 1, Space Satellite A, Space Meteor Large, Space Rocket 1
+Reactify – free to use in your games
+  Score Badge
+
+Kenney assets are CC0 (public domain): https://kenney.nl

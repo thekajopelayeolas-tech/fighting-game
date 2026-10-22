@@ -10,13 +10,68 @@
     return c ? c.asset : 'knight';
   }
 
-  function drawSprite(ctx, img, row, frame, x, y, size, flip) {
+  // Tinted frames are cached: one offscreen canvas per sheet, frame, and colour.
+  const tintCache = {};
+
+  // Hex colour for one of 12 hue steps (30 degrees each), used for the rainbow.
+  // Standard HSV to RGB at full saturation and brightness.
+  function rainbowHex(step) {
+    const hue = (step % 12) * 30;
+    const x = 1 - Math.abs(((hue / 60) % 2) - 1);
+    const sector = Math.floor(hue / 60);
+    const rgb = [[1, x, 0], [x, 1, 0], [0, 1, x], [0, x, 1], [x, 0, 1], [1, 0, x]][sector];
+    return '#' + rgb.map((v) => Math.round(v * 255).toString(16).padStart(2, '0')).join('');
+  }
+
+  // Returns a copy of one frame with the colour applied to its solid pixels only.
+  // The transparent parts stay transparent, so the character's silhouette is unchanged.
+  function tintedFrame(img, row, frame, hex) {
+    const key = [img.src, row, frame, hex].join('|');
+    if (tintCache[key]) return tintCache[key];
+    const c = document.createElement('canvas');
+    c.width = FS;
+    c.height = FS;
+    const cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    cx.drawImage(img, frame * FS, row * FS, FS, FS, 0, 0, FS, FS);
+    cx.globalCompositeOperation = 'source-atop';
+    cx.fillStyle = hex;
+    cx.globalAlpha = 0.55;
+    cx.fillRect(0, 0, FS, FS);
+    tintCache[key] = c;
+    return c;
+  }
+
+  // A tinted copy of one frame from a horizontal strip, cached like the sprite-sheet tints.
+  function tintedStrip(img, frame, frameSize, hex) {
+    const key = ['strip', img.src, frame, frameSize, hex].join('|');
+    if (tintCache[key]) return tintCache[key];
+    const c = document.createElement('canvas');
+    c.width = frameSize;
+    c.height = frameSize;
+    const cx = c.getContext('2d');
+    cx.imageSmoothingEnabled = false;
+    cx.drawImage(img, frame * frameSize, 0, frameSize, frameSize, 0, 0, frameSize, frameSize);
+    cx.globalCompositeOperation = 'source-atop';
+    cx.fillStyle = hex;
+    cx.globalAlpha = 0.6;
+    cx.fillRect(0, 0, frameSize, frameSize);
+    tintCache[key] = c;
+    return c;
+  }
+
+  // Draws one frame of a sprite sheet. With `tint` (a hex colour) the character takes that colour.
+  function drawSprite(ctx, img, row, frame, x, y, size, flip, tint) {
     if (!img || !img.complete || !img.naturalWidth) return false;
     ctx.save();
     ctx.translate(x, y);
     if (flip) ctx.scale(-1, 1);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, frame * FS, row * FS, FS, FS, -size / 2, -size / 2, size, size);
+    if (tint && typeof document !== 'undefined') {
+      ctx.drawImage(tintedFrame(img, row, frame, tint), -size / 2, -size / 2, size, size);
+    } else {
+      ctx.drawImage(img, frame * FS, row * FS, FS, FS, -size / 2, -size / 2, size, size);
+    }
     ctx.restore();
     return true;
   }
@@ -52,11 +107,20 @@
       ctx.restore();
     }
     const cfg = CONFIG.sprite;
-    const frame = p.moving ? Math.floor(time * cfg.fps) % cfg.frames.walk : 0;
+    // Show the attack pose for a short moment after a melee swing; otherwise walk or stand.
+    const swinging = p.swingTime > 0;
+    const row = swinging ? cfg.rows.attack : cfg.rows.walk;
+    const frames = swinging ? cfg.frames.attack : cfg.frames.walk;
+    const frame = swinging
+      ? Math.min(frames - 1, Math.floor((1 - p.swingTime / CONFIG.sprite.swingPose) * frames))
+      : p.moving ? Math.floor(time * cfg.fps) % frames : 0;
     ctx.save();
     if (p.down) ctx.globalAlpha = 0.35;
     const size = CONFIG.player.drawSize;
-    const drawn = drawSprite(ctx, assets[characterAsset(p)], cfg.rows.walk, frame, p.x, p.y, size, p.facing < 0);
+    // The equipped dust colour tints the character. The rainbow cycles through hues over time.
+    // Hue moves in 30-degree steps, so the tint cache only holds 12 rainbow frames.
+    const tint = p.glow === 'rainbow' ? rainbowHex(Math.floor(time * 4) % 12) : p.glowHex;
+    const drawn = drawSprite(ctx, assets[characterAsset(p)], row, frame, p.x, p.y, size, p.facing < 0, p.glow ? tint : null);
     ctx.restore();
     if (!drawn) {
       ctx.save();
@@ -81,14 +145,32 @@
   }
 
   // Draws one frame of a horizontal strip (frames laid out left to right).
-  function drawStrip(ctx, img, frame, frameSize, x, y, size, flip, rotation) {
+  function drawStrip(ctx, img, frame, frameSize, x, y, size, flip, rotation, tint) {
     if (!img || !img.naturalWidth) return false;
     ctx.save();
     ctx.translate(x, y);
     if (rotation) ctx.rotate(rotation);
     if (flip) ctx.scale(-1, 1);
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(img, frame * frameSize, 0, frameSize, frameSize, -size / 2, -size / 2, size, size);
+    if (tint && typeof document !== 'undefined') {
+      // Tinted strips reuse the cached colour frames; the tint only colours the solid pixels.
+      ctx.drawImage(tintedStrip(img, frame, frameSize, tint), -size / 2, -size / 2, size, size);
+    } else {
+      ctx.drawImage(img, frame * frameSize, 0, frameSize, frameSize, -size / 2, -size / 2, size, size);
+    }
+    ctx.restore();
+    return true;
+  }
+
+  // Draws a whole image at a fixed height, keeping its own proportions.
+  function drawWhole(ctx, img, x, y, height, flip) {
+    if (!img || !img.naturalWidth) return false;
+    const width = height * (img.naturalWidth / img.naturalHeight);
+    ctx.save();
+    ctx.translate(x, y);
+    if (flip) ctx.scale(-1, 1);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(img, -width / 2, -height / 2, width, height);
     ctx.restore();
     return true;
   }
@@ -113,16 +195,30 @@
       const def = CONFIG.enemies[e.type];
       const spr = def.sprite;
       const img = spr ? assets[spr.image] : null;
-      const size = e.radius * 2.4;
+      const size = spr && spr.whole ? spr.height : e.radius * 2.4;
       const half = Math.max(e.radius, size / 2);
-      const drawn = spr && drawStrip(
-        ctx, img,
-        spr.frames > 1 ? Math.floor(time * 8 + e.id) % spr.frames : 0,
-        spr.frameSize,
-        e.x, e.y, size,
-        e.x > nearestLivingX(state, e.x),
-        e.type === 'brute' ? time * 1.5 : 0
-      );
+      const facingLeft = e.x > nearestLivingX(state, e.x);
+      const drawn = spr && (spr.whole
+        ? drawWhole(ctx, img, e.x, e.y, size, facingLeft)
+        : drawStrip(
+          ctx, img,
+          spr.frames > 1 ? Math.floor(time * 8 + e.id) % spr.frames : 0,
+          spr.frameSize,
+          e.x, e.y, size,
+          facingLeft,
+          spr.spin ? time * 1.5 : 0,
+          spr.tint
+        ));
+      // Armoured enemies get a grey shell ring, so the damage reduction is visible.
+      if (def.armour) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(173, 181, 189, 0.85)';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, half + 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
       if (!drawn) {
         ctx.save();
         ctx.translate(e.x, e.y);
@@ -138,6 +234,216 @@
       ctx.fillRect(-e.radius, half + 4, e.radius * 2, 4);
       ctx.fillStyle = '#ef476f';
       ctx.fillRect(-e.radius, half + 4, (e.radius * 2 * Math.max(0, e.health)) / e.maxHealth, 4);
+      ctx.restore();
+    }
+  }
+
+  // Neon glow: draws a shape with a soft coloured halo behind it.
+  function neon(ctx, color, width, draw) {
+    ctx.save();
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    draw();
+    ctx.restore();
+  }
+
+  // Draws the base hub: a lit floor, the practice range with dummies, neon stations, and an animated portal.
+  // Only reads state and config, so it never changes the game.
+  function drawBase(ctx, state, time) {
+    const B = CONFIG.base;
+    drawBaseFloor(ctx, time);
+    drawPracticeRange(ctx, B.practice, time);
+    drawDummies(ctx, state);
+    drawStations(ctx, B, time);
+    drawPortal(ctx, B.portal, time);
+    drawMotes(ctx, time);
+  }
+
+  // Dark floor with a perspective grid, and a glowing horizon line.
+  function drawBaseFloor(ctx, time) {
+    const W = CONFIG.world.width;
+    const H = CONFIG.world.height;
+    const horizon = H * 0.58;
+    ctx.save();
+    const g = ctx.createLinearGradient(0, horizon, 0, H);
+    g.addColorStop(0, 'rgba(10, 8, 30, 0.2)');
+    g.addColorStop(1, 'rgba(7, 11, 22, 0.85)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, horizon, W, H - horizon);
+    ctx.strokeStyle = 'rgba(199, 125, 255, 0.22)';
+    ctx.lineWidth = 1;
+    // Horizontal lines bunch up toward the horizon, and slide toward the viewer over time.
+    for (let i = 0; i < 14; i++) {
+      const t = (i + (time * 0.6) % 1) / 14;
+      const y = horizon + (H - horizon) * t * t;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(W, y);
+      ctx.stroke();
+    }
+    // Vertical lines fan out from the centre of the horizon.
+    for (let i = -10; i <= 10; i++) {
+      ctx.beginPath();
+      ctx.moveTo(W / 2, horizon);
+      ctx.lineTo(W / 2 + i * 180, H);
+      ctx.stroke();
+    }
+    neon(ctx, '#c77dff', 2, function () {
+      ctx.beginPath();
+      ctx.moveTo(0, horizon);
+      ctx.lineTo(W, horizon);
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  // The practice range: a striped lane with a neon border that scrolls.
+  function drawPracticeRange(ctx, pr, time) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(7, 11, 22, 0.6)';
+    ctx.fillRect(pr.x, pr.y, pr.w, pr.h);
+    ctx.fillStyle = 'rgba(255, 209, 102, 0.06)';
+    for (let x = pr.x; x < pr.x + pr.w; x += 40) ctx.fillRect(x, pr.y, 20, pr.h);
+    neon(ctx, '#ffd166', 3, function () {
+      ctx.setLineDash([14, 8]);
+      ctx.lineDashOffset = -time * 20;
+      ctx.strokeRect(pr.x, pr.y, pr.w, pr.h);
+      ctx.setLineDash([]);
+    });
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 16px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('PRACTICE RANGE', pr.x + 10, pr.y - 10);
+    ctx.restore();
+  }
+
+  // Practice dummies: targets with a health bar. They can be hit but never fight back.
+  function drawDummies(ctx, state) {
+    for (const d of state.dummies || []) {
+      ctx.save();
+      ctx.fillStyle = '#e9ecef';
+      ctx.strokeStyle = '#495057';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 22, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = '#e63946';
+      ctx.beginPath();
+      ctx.arc(d.x, d.y, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(d.x - 22, d.y + 28, 44, 5);
+      ctx.fillStyle = '#70e000';
+      ctx.fillRect(d.x - 22, d.y + 28, 44 * (d.health / d.maxHealth), 5);
+      ctx.restore();
+    }
+  }
+
+  // Station pillars: a dark block with a neon frame that pulses and a glowing sign.
+  function drawStations(ctx, B, time) {
+    const stations = [
+      { at: B.colorStation, label: 'COLOUR', color: '#4cc9f0' },
+      { at: B.dustMachine, label: 'DUST', color: '#ffd166' },
+      { at: B.shop, label: 'SHOP', color: '#70e000' },
+    ];
+    for (const s of stations) {
+      const pulse = 0.75 + 0.25 * Math.sin(time * 3 + s.at.x);
+      ctx.save();
+      ctx.fillStyle = 'rgba(20, 33, 61, 0.95)';
+      ctx.fillRect(s.at.x - 62, s.at.y - 46, 124, 92);
+      ctx.globalAlpha = pulse;
+      neon(ctx, s.color, 3, function () {
+        ctx.strokeRect(s.at.x - 62, s.at.y - 46, 124, 92);
+      });
+      ctx.globalAlpha = 1;
+      ctx.shadowColor = s.color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = s.color;
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(s.label, s.at.x, s.at.y + 6);
+      ctx.restore();
+    }
+  }
+
+  // Portal: a glowing core, three counter-rotating neon rings, and sparks orbiting outside.
+  function drawPortal(ctx, portal, time) {
+    ctx.save();
+    const core = ctx.createRadialGradient(portal.x, portal.y, 4, portal.x, portal.y, portal.radius);
+    core.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+    core.addColorStop(0.4, 'rgba(199, 125, 255, 0.55)');
+    core.addColorStop(1, 'rgba(199, 125, 255, 0)');
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.arc(portal.x, portal.y, portal.radius, 0, Math.PI * 2);
+    ctx.fill();
+    const colors = ['#c77dff', '#4cc9f0', '#f72585'];
+    for (let i = 0; i < 3; i++) {
+      const dir = i % 2 ? -1 : 1;
+      const spin = time * (1.2 + i * 0.4) * dir;
+      neon(ctx, colors[i], 5 - i, function () {
+        ctx.beginPath();
+        ctx.arc(portal.x, portal.y, portal.radius - i * 10, spin, spin + Math.PI * 1.6);
+        ctx.stroke();
+      });
+    }
+    for (let i = 0; i < 6; i++) {
+      const a = time * 1.5 + i * (Math.PI / 3);
+      ctx.fillStyle = '#f1faee';
+      ctx.beginPath();
+      ctx.arc(portal.x + Math.cos(a) * (portal.radius + 8), portal.y + Math.sin(a) * (portal.radius + 8), 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#f1faee';
+    ctx.font = 'bold 15px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ARENA - press E', portal.x, portal.y + portal.radius + 22);
+    ctx.restore();
+  }
+
+  // Slow drifting light motes across the base, for atmosphere.
+  function drawMotes(ctx, time) {
+    ctx.save();
+    for (let i = 0; i < 40; i++) {
+      const x = (i * 157 + time * (10 + (i % 5) * 4)) % CONFIG.world.width;
+      const y = ((i * 97) % CONFIG.world.height) * 0.7 + Math.sin(time + i) * 12;
+      ctx.globalAlpha = 0.3 + 0.3 * Math.sin(time * 2 + i);
+      ctx.fillStyle = i % 3 === 0 ? '#ffd166' : '#c77dff';
+      ctx.fillRect(x, y, 2, 2);
+    }
+    ctx.restore();
+  }
+  // PvP walls: each wall is tiled with one solid block from the wall tile sheet (tile 0, top left).
+  // A light tint and an outline keep walls readable on dark backgrounds.
+  function drawWalls(ctx, state, assets) {
+    const img = assets.wallTiles;
+    const cfg = CONFIG.versus.walls;
+    const tile = cfg.tile;
+    for (const wall of state.walls || []) {
+      ctx.save();
+      for (let y = wall.y; y < wall.y + wall.h; y += tile) {
+        for (let x = wall.x; x < wall.x + wall.w; x += tile) {
+          if (img && img.naturalWidth) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(img, 0, 0, tile, tile, x, y, tile, tile);
+          } else {
+            ctx.fillStyle = '#4a4e69';
+            ctx.fillRect(x, y, tile, tile);
+          }
+        }
+      }
+      ctx.fillStyle = cfg.tint;
+      ctx.fillRect(wall.x, wall.y, wall.w, wall.h);
+      // Dark border first, then a light edge inside it, so the shape reads on light and dark backgrounds.
+      ctx.strokeStyle = cfg.shadowColor;
+      ctx.lineWidth = cfg.shadowWidth;
+      ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
+      ctx.strokeStyle = cfg.edgeColor;
+      ctx.lineWidth = cfg.edgeWidth;
+      ctx.strokeRect(wall.x, wall.y, wall.w, wall.h);
       ctx.restore();
     }
   }
@@ -188,13 +494,39 @@
     }
   }
 
+  // Sparks are dots that shrink as they fade; popups are damage numbers that fade out.
+  function drawEffects(ctx, state) {
+    for (const fx of state.effects) {
+      const t = Math.max(0, fx.life / fx.maxLife);
+      ctx.save();
+      ctx.globalAlpha = t;
+      ctx.fillStyle = fx.color;
+      if (fx.kind === 'spark') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, 1.5 + 2.5 * t, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.font = 'bold 15px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.strokeStyle = 'rgba(7, 11, 22, 0.8)';
+        ctx.lineWidth = 3;
+        ctx.strokeText(fx.text, fx.x, fx.y);
+        ctx.fillText(fx.text, fx.x, fx.y);
+      }
+      ctx.restore();
+    }
+  }
+
   const api = {
     drawSprite: drawSprite,
     drawPlayers: drawPlayers,
     drawEnemies: drawEnemies,
+    drawWalls: drawWalls,
+    drawBase: drawBase,
     drawProjectiles: drawProjectiles,
     drawSwings: drawSwings,
     drawPickups: drawPickups,
+    drawEffects: drawEffects,
   };
   root.Render = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -4,7 +4,7 @@
 
   const SOUNDS = {
     laser: { file: 'assets/sounds/laser_1.mp3', volume: 0.35 },
-    swing: { file: 'assets/sounds/dash_whoosh.mp3', volume: 0.3 },
+    swing: { file: 'assets/sounds/pirate_swing.mp3', volume: 0.3 },
     dash: { file: 'assets/sounds/dash_whoosh.mp3', volume: 0.5 },
     coin: { file: 'assets/sounds/coin_pickup.mp3', volume: 0.5 },
     drop: { file: 'assets/sounds/drop.mp3', volume: 0.5 },
@@ -13,6 +13,9 @@
     back: { file: 'assets/sounds/back.mp3', volume: 0.4 },
     next: { file: 'assets/sounds/next.mp3', volume: 0.5 },
     win: { file: 'assets/sounds/rover_win.mp3', volume: 0.6 },
+    hurt: { file: 'assets/sounds/jump_1.mp3', volume: 0.45 },
+    powerUp: { file: 'assets/sounds/spring_bounce.mp3', volume: 0.5 },
+    footstep: { file: 'assets/sounds/footstep_snow.mp3', volume: 0.15 },
   };
   const MUSIC = { file: 'assets/sounds/space_adventure_music.mp3', volume: 0.25 };
 

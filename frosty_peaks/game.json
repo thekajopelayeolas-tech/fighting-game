@@ -1,0 +1,9 @@
+{
+  "title": "Frosty Peaks",
+  "scenes": [
+    {
+      "name": "Frosty Peaks",
+      "file": "scene.json"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "title": "Star Rocket Run",
+  "scenes": [
+    {
+      "name": "Star Rocket Run",
+      "file": "scene.json"
+    }
+  ]
+}

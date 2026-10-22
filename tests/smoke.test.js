@@ -34,8 +34,10 @@ function makeEl(id) {
     addEventListener(type, fn) { (this.listeners[type] = this.listeners[type] || []).push(fn); },
     getBoundingClientRect() { return { left: 0, top: 0, width: 1280, height: 720 }; },
     getContext() {
+      // Gradient methods must return an object with addColorStop, as a real canvas does.
+      const gradient = () => ({ addColorStop() {} });
       return new Proxy({}, {
-        get: (t, k) => (k in t ? t[k] : function () {}),
+        get: (t, k) => (k in t ? t[k] : (k === 'createLinearGradient' || k === 'createRadialGradient' ? gradient : function () {})),
         set: (t, k, v) => { t[k] = v; return true; },
       });
     },
@@ -47,7 +49,7 @@ function makeEl(id) {
 test('browser scripts run for many frames without throwing', () => {
   const root = path.join(__dirname, '..');
   const ids = ['game', 'hud', 'shop', 'title', 'gameover', 'shop-coins', 'shop-upgrades', 'shop-weapons',
-    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back'];
+    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   const store = {};
@@ -66,7 +68,7 @@ test('browser scripts run for many frames without throwing', () => {
   sandbox.window = sandbox;
   sandbox.addEventListener = () => {};
   const ctx = vm.createContext(sandbox);
-  for (const f of ['js/config.js', 'js/audio.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
+  for (const f of ['js/config.js', 'js/audio.js', 'js/base.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
   }
   assert.ok(frameCb, 'a frame should be scheduled');
@@ -98,7 +100,7 @@ test('PvP versus starts a match and shows both players', () => {
   const root = path.join(__dirname, '..');
   const ids = ['game', 'hud', 'shop', 'title', 'gameover', 'shop-coins', 'shop-upgrades', 'shop-weapons', 'shop-tabs',
     'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best',
-    'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back'];
+    'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   const store = {};
@@ -114,7 +116,7 @@ test('PvP versus starts a match and shows both players', () => {
   sandbox.window = sandbox;
   sandbox.addEventListener = () => {};
   const ctx = vm.createContext(sandbox);
-  for (const f of ['js/config.js', 'js/audio.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
+  for (const f of ['js/config.js', 'js/audio.js', 'js/base.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
   }
   let now = 0;
@@ -138,7 +140,7 @@ test('PvP versus starts a match and shows both players', () => {
 test('2 player co-op runs through the browser code', () => {
   const root = path.join(__dirname, '..');
   const ids = ['game', 'hud', 'shop', 'title', 'gameover', 'shop-coins', 'shop-upgrades', 'shop-weapons', 'shop-tabs',
-    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back'];
+    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   const store = {};
@@ -154,7 +156,7 @@ test('2 player co-op runs through the browser code', () => {
   sandbox.window = sandbox;
   sandbox.addEventListener = () => {};
   const ctx = vm.createContext(sandbox);
-  for (const f of ['js/config.js', 'js/audio.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
+  for (const f of ['js/config.js', 'js/audio.js', 'js/base.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
   }
   let now = 0;

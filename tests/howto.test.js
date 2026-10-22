@@ -38,7 +38,7 @@ test('HOW TO PLAY opens the panel and BACK or Escape closes it', () => {
     'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best',
     'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label',
     'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back',
-    'howto', 'howto-btn', 'howto-back'];
+    'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   // The page starts with these overlays hidden; mirror that in the stubs.
@@ -59,7 +59,7 @@ test('HOW TO PLAY opens the panel and BACK or Escape closes it', () => {
   sandbox.window = sandbox;
   sandbox.addEventListener = (type, fn) => { if (type === 'keydown') keyHandlers.push(fn); };
   const ctx = vm.createContext(sandbox);
-  for (const f of ['js/config.js', 'js/audio.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
+  for (const f of ['js/config.js', 'js/audio.js', 'js/base.js', 'js/game.js', 'js/render.js', 'js/main.js']) {
     vm.runInContext(fs.readFileSync(path.join(root, f), 'utf8'), ctx, { filename: f });
   }
   const click = (el) => (el.listeners.click || []).forEach((fn) => fn({ target: el }));
