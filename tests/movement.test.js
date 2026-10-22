@@ -53,8 +53,12 @@ test('the player is drawn smaller than the old 64px sprite', () => {
 });
 
 test('every character on the select screen has a sprite asset', () => {
-  assert.equal(CFG.characters.length, 5);
+  // Five normal characters plus the Super Character, which is bought in the shop.
+  assert.equal(CFG.characters.length, 6);
   for (const c of CFG.characters) {
     assert.ok(CFG.assets[c.asset], c.id + ' has no asset key');
+    if (c.cycle) {
+      for (const sheet of c.cycle) assert.ok(CFG.assets[CFG.characters.find((x) => x.id === sheet).asset], sheet + ' has no sprite');
+    }
   }
 });

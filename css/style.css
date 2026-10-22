@@ -47,6 +47,37 @@ body {
   pointer-events: none;
 }
 
+/* Track Down button: sits in the play view, bottom left. It pulses while ON so it's easy to see. */
+.track-btn {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 5;
+  font: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 77, 109, 0.7);
+  background: rgba(7, 11, 22, 0.8);
+  color: #f1faee;
+  cursor: pointer;
+}
+.track-btn:hover { border-color: #ffd166; }
+/* Only shown while playing: hidden on the title, select and game-over screens. */
+.track-btn.menu-hidden { display: none; }
+.track-btn.on {
+  border-color: #ff4d6d;
+  background: #ff4d6d;
+  color: #070b16;
+  animation: track-pulse 1s ease-in-out infinite;
+}
+@keyframes track-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 77, 109, 0.6); }
+  50% { box-shadow: 0 0 14px 4px rgba(255, 77, 109, 0.5); }
+}
+
 .overlay {
   position: absolute;
   inset: 0;
@@ -350,6 +381,11 @@ body {
 .char-card .name { font-size: 13px; font-weight: bold; }
 .char-card .badge { font-size: 11px; color: #ffd166; min-height: 14px; }
 .char-card canvas { image-rendering: pixelated; }
+/* Locked characters (the Super Character before it is bought): dimmed, with a lock in the corner. */
+.char-card.locked { position: relative; opacity: 0.55; border-style: dashed; }
+.char-card.locked .lock { position: absolute; top: 6px; right: 8px; font-size: 16px; }
+.char-card.locked .badge { color: #ff9f1c; white-space: normal; text-align: center; }
+.char-card.locked:disabled { cursor: not-allowed; }
 
 @media (max-width: 760px) {
   .select-grid { grid-template-columns: repeat(3, 120px); }

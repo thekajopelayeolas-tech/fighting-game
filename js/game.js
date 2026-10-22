@@ -58,6 +58,8 @@
       aim: 0,
       invuln: 0,
       cooldown: 0,
+      // Special ability: a timer that counts down after each use (0 means ready).
+      specialCooldown: 0,
       weapon: 'gun',
       owned: { gun: true },
       ammo: { gun: CFG.weapons.gun.ammo },
@@ -171,6 +173,93 @@
     p.down = false;
     p.health = p.maxHealth;
     state.dummies = (typeof Base !== 'undefined' ? Base : require('./base.js')).makeDummies();
+  }
+
+  // Shop rooms. Standing on a room's door enters it; standing on its exit leaves.
+  // While inside, the base floor is not used: the player is moved to the room's entrance.
+  function roomAt(p, x, y, r) {
+    return Math.hypot(p.x - x, p.y - y) <= r;
+  }
+
+  function enterRoom(state, roomId) {
+    const room = CFG.base.rooms[roomId];
+    if (!room) return false;
+    const p = state.players[0];
+    state.room = roomId;
+    // Enter at the bottom centre of the room, clear of the exit.
+    p.x = room.interior.x + room.interior.w / 2;
+    p.y = room.interior.y + room.interior.h - 80;
+    return true;
+  }
+
+  // Stepping on the exit of the current room returns the player to the base, at that room's door.
+  function leaveRoomIfAtExit(state) {
+    if (!state.room) return false;
+    const room = CFG.base.rooms[state.room];
+    const p = state.players[0];
+    if (!roomAt(p, room.exit.x, room.exit.y, room.exit.r)) return false;
+    p.x = room.door.x;
+    p.y = room.door.y + room.door.r + 30;
+    state.room = null;
+    return true;
+  }
+
+  // Shelf positions for a room's items: a grid across the room's interior.
+  // Returns [{ item, x, y }] so the renderer and the E key agree on where each item sits.
+  function roomShelves(roomId) {
+    const room = CFG.base.rooms[roomId];
+    if (!room) return [];
+    const items = (typeof Base !== 'undefined' ? Base : require('./base.js')).roomItems(roomId);
+    const cols = Math.min(4, Math.max(1, items.length));
+    const gap = room.interior.w / (cols + 1);
+    return items.map(function (item, i) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      return { item: item, x: room.interior.x + gap * (col + 1), y: room.interior.y + 150 + row * 170 };
+    });
+  }
+
+  // The item nearest the player that is within reach, or null.
+  function nearestShelfItem(state, p) {
+    if (!state.room) return null;
+    let best = null;
+    let bestDist = 90;
+    for (const s of roomShelves(state.room)) {
+      const d = Math.hypot(p.x - s.x, p.y - s.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = s;
+      }
+    }
+    return best;
+  }
+
+  // Buys (or equips) the item the player is standing next to. Uses the same rules as the arena shop and base panels.
+  // dust is the saved dust balance, which lives in the save, not on the run, so the caller passes it in.
+  function buyShelfItem(state, p, dust) {
+    const shelf = nearestShelfItem(state, p);
+    if (!shelf) return { ok: false, reason: 'Stand next to an item' };
+    const item = shelf.item;
+    const B = typeof Base !== 'undefined' ? Base : require('./base.js');
+    const wallets = { coins: state.coins, dust: dust || 0 };
+    const afford = B.canAfford(item, wallets);
+    if (!afford.ok) return afford;
+    if (item.kind === 'weapon') {
+      const id = item.key.split(':')[1];
+      if (p.owned[id]) return { ok: false, reason: 'Already owned' };
+      return buyWeapon(state, id, p);
+    }
+    if (item.kind === 'armour') {
+      return buyArmour(state, item.key.split(':')[1], p);
+    }
+    // The Super Character is paid in coins from the run. main.js records it in the save.
+    if (item.kind === 'character') {
+      const id = item.key.split(':')[1];
+      state.coins -= item.price;
+      return { ok: true, character: id, cost: item.price, coins: true };
+    }
+    // Colours and the rainbow are paid in dust; the save handles that in main.js.
+    return { ok: true, colour: item.key.split(':')[1], cost: item.price, dust: true };
   }
 
   // Leaves the base and starts the real arena wave, as a normal solo run.
@@ -649,8 +738,10 @@
       const dx = target.x - e.x;
       const dy = target.y - e.y;
       const d = Math.hypot(dx, dy) || 1;
-      e.x += (dx / d) * e.speed * dt;
-      e.y += (dy / d) * e.speed * dt;
+      // A croak slows enemies: while slowUntil is in the future, they move at slowFactor speed.
+      const slow = e.slowUntil && state.time < e.slowUntil ? e.slowFactor : 1;
+      e.x += (dx / d) * e.speed * slow * dt;
+      e.y += (dy / d) * e.speed * slow * dt;
       if (e.attackCd > 0) continue;
       for (const p of state.players) {
         if (p.down) continue;
@@ -720,6 +811,96 @@
     }
     p.invuln = Math.max(0, p.invuln - dt);
     p.cooldown = Math.max(0, p.cooldown - dt);
+    p.specialCooldown = Math.max(0, (p.specialCooldown || 0) - dt);
+  }
+
+  // The special ability a player's character has, or null.
+  function specialOf(p) {
+    const c = CFG.characters.find((ch) => ch.id === p.character);
+    return c && c.special ? c.special : null;
+  }
+
+  // Track Down: the enemy a player should aim at, or null when there is nothing to track.
+  // Used by player 1 when Track Down is on, so the gun locks onto the nearest enemy.
+  function trackTarget(state, p) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const e of state.enemies || []) {
+      if (e.dead) continue;
+      const d = dist(p.x, p.y, e.x, e.y);
+      if (d < bestDist) {
+        bestDist = d;
+        best = e;
+      }
+    }
+    return best;
+  }
+
+  // Uses the player's special if it is ready. Returns true when it fired.
+  // Each special reuses the game's own rules: shield and haste are the existing power-ups.
+  function useSpecial(state, p) {
+    const sp = specialOf(p);
+    if (!sp || p.down || state.phase !== 'fighting' || p.specialCooldown > 0) return false;
+    p.specialCooldown = sp.cooldown;
+    // The Super Burst runs all five specials at once; each part runs its normal effect.
+    if (sp.id === 'superBurst') {
+      for (const part of sp.parts) runSpecialEffect(state, p, part);
+      state.events.push('special');
+      return true;
+    }
+    runSpecialEffect(state, p, sp.id);
+    state.events.push('special');
+    return true;
+  }
+
+  // Finds the numbers for one special effect by its id, from whichever character defines it.
+  // The Super Burst's parts reuse the numbers from the normal characters' specials.
+  function findSpecialById(id) {
+    for (const c of CFG.characters) {
+      if (c.special && c.special.id === id) return c.special;
+    }
+    return null;
+  }
+
+  // The effect of one special, by its id. Used directly for normal characters and once per part for the Super Burst.
+  function runSpecialEffect(state, p, id) {
+    const sp = findSpecialById(id);
+    if (!sp) return false;
+    switch (sp.id) {
+      case 'shieldWall':
+        p.powerUps.shield = sp.duration;
+        break;
+      case 'overcharge':
+        p.powerUps.haste = sp.duration;
+        break;
+      case 'stomp':
+        for (const e of state.enemies) {
+          if (e.dead || dist(p.x, p.y, e.x, e.y) > sp.radius) continue;
+          damageEnemy(state, e, sp.damage, p);
+          // Knock back: push the enemy away from the player by `knockback` pixels.
+          const d = Math.hypot(e.x - p.x, e.y - p.y) || 1;
+          e.x += ((e.x - p.x) / d) * sp.knockback;
+          e.y += ((e.y - p.y) / d) * sp.knockback;
+        }
+        spawnSparks(state, p.x, p.y, CFG.effects.deathSparks, '#70e000');
+        state.shake = Math.max(state.shake, CFG.effects.shake);
+        break;
+      case 'heal':
+        p.health = Math.min(p.maxHealth, p.health + sp.amount);
+        spawnPopup(state, p.x, p.y - 30, '+' + sp.amount, '#70e000');
+        break;
+      case 'croak':
+        for (const e of state.enemies) {
+          if (e.dead || dist(p.x, p.y, e.x, e.y) > sp.radius) continue;
+          e.slowUntil = state.time + sp.duration;
+          e.slowFactor = sp.slow;
+        }
+        spawnSparks(state, p.x, p.y, CFG.effects.hitSparks, '#70e000');
+        break;
+      default:
+        return false;
+    }
+    return true;
   }
 
   function movePlayer(p, dt, input, state) {
@@ -755,6 +936,18 @@
     const input = list[0] || {};
     tickPlayer(p, dt);
     movePlayer(p, dt, input, state);
+    // Walking onto a door opens that room; walking onto the room's exit leaves it.
+    if (state.room) {
+      leaveRoomIfAtExit(state);
+    } else {
+      for (const id of Object.keys(CFG.base.rooms)) {
+        const d = CFG.base.rooms[id].door;
+        if (roomAt(p, d.x, d.y, d.r)) {
+          enterRoom(state, id);
+          break;
+        }
+      }
+    }
     if (input.firing && p.cooldown <= 0) fire(state, input.aimX, input.aimY, p);
     // Dummies take hits and never attack; they reset to full health when they die.
     for (const d of state.dummies || []) {
@@ -800,6 +993,7 @@
       movePlayer(p, dt, input, state);
       if (input.firing && p.cooldown <= 0) fire(state, input.aimX, input.aimY, p);
       if (input.interact) interact(state, p);
+      if (input.special) useSpecial(state, p);
       collectPowerUps(state, p);
     }
     state.swings = state.swings.filter((s) => {
@@ -954,11 +1148,18 @@
     buyWeapon: buyWeapon,
     equipWeapon: equipWeapon,
     buyArmour: buyArmour,
+    enterRoom: enterRoom,
+    roomShelves: roomShelves,
+    nearestShelfItem: nearestShelfItem,
+    buyShelfItem: buyShelfItem,
     upgradeArmour: upgradeArmour,
     armourReductionOf: armourReductionOf,
     upgradeCost: upgradeCost,
     fire: fire,
     interact: interact,
+    trackTarget: trackTarget,
+    useSpecial: useSpecial,
+    specialOf: specialOf,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

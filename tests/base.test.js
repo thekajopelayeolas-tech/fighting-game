@@ -117,9 +117,13 @@ test('entering the arena starts a real wave', () => {
   assert.deepEqual(s.dummies, []);
 });
 
-test('the portal is only near the portal spot', () => {
-  const p = { x: CFG.base.portal.x, y: CFG.base.portal.y };
-  assert.equal(Base.nearPortal(p), true);
+test('each portal is only entered at its own spot', () => {
+  for (const id of Object.keys(CFG.base.portals)) {
+    const portal = CFG.base.portals[id];
+    const p = { x: portal.x, y: portal.y };
+    assert.equal(Base.nearPortal(p), true, id + ' portal should be entered at its spot');
+    assert.equal(Base.portalAt(p).id, id);
+  }
   assert.equal(Base.nearPortal({ x: 100, y: 100 }), false);
 });
 
