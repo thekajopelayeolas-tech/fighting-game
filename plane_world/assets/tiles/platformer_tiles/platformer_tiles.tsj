@@ -1,0 +1,13 @@
+{
+  "type": "tileset",
+  "name": "platformer_tiles",
+  "image": "platformer_tiles.png",
+  "imagewidth": 360,
+  "imageheight": 162,
+  "tilewidth": 18,
+  "tileheight": 18,
+  "columns": 20,
+  "tilecount": 180,
+  "margin": 0,
+  "spacing": 0
+}

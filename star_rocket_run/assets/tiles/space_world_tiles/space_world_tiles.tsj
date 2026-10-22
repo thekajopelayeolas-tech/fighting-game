@@ -1,0 +1,13 @@
+{
+  "type": "tileset",
+  "name": "space_world_tiles",
+  "image": "space_world_tiles.png",
+  "imagewidth": 64,
+  "imageheight": 64,
+  "tilewidth": 16,
+  "tileheight": 16,
+  "columns": 4,
+  "tilecount": 16,
+  "margin": 0,
+  "spacing": 0
+}

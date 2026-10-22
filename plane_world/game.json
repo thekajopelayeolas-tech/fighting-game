@@ -1,0 +1,9 @@
+{
+  "title": "plane world",
+  "scenes": [
+    {
+      "name": "plane world",
+      "file": "scene.json"
+    }
+  ]
+}
