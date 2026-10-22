@@ -4,12 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Survival Arena</title>
+  <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="stage">
     <canvas id="game"></canvas>
     <div id="hud" class="hud"></div>
+    <button id="track-btn" class="track-btn menu-hidden" title="Track Down: player 1 aims at the nearest enemy (T)">TRACK DOWN: OFF</button>
 
     <div id="title" class="overlay">
       <div class="title-card">
@@ -41,9 +43,9 @@
           </section>
           <section>
             <h3>Controls: Player 1</h3>
-            <p>WASD move &middot; Mouse aims &middot; Space or click fires &middot; E picks up or revives &middot; 1-9 switch weapon</p>
+            <p>WASD move &middot; Mouse aims &middot; Space or click fires &middot; E picks up or revives &middot; 1-9 switch weapon &middot; Left Shift uses special</p>
             <h3>Controls: Player 2</h3>
-            <p>Arrow keys move &middot; Auto-aims &middot; Right Shift fires &middot; Right Ctrl picks up or revives &middot; Numpad 0 switches weapon</p>
+            <p>Arrow keys move &middot; Auto-aims &middot; Right Shift fires &middot; Right Ctrl picks up or revives &middot; Numpad 0 switches weapon &middot; Enter uses special</p>
             <h3>Other</h3>
             <p>P or Esc pauses &middot; M mutes</p>
           </section>

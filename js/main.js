@@ -100,6 +100,11 @@
     }
     else if (screen === 'playing') {
       if (e.code === 'KeyP' || e.code === 'Escape') setPaused(!paused);
+      // T toggles Track Down for player 1 (the same as the on-screen button).
+      if (!e.repeat && e.code === 'KeyT') toggleTrackDown();
+      // Left Shift uses player 1's special; Enter uses player 2's (co-op and PvP).
+      if (!e.repeat && e.code === SPECIAL_KEYS[0]) pendingSpecial[0] = true;
+      if (!e.repeat && playerCount === 2 && e.code === SPECIAL_KEYS[1]) pendingSpecial[1] = true;
       if (e.code === 'KeyE' && run.inBase) useBaseSpot(run.players[0]);
       else if (e.code === 'KeyE') Game.interact(run, run.players[0]);
       if (playerCount === 2 && e.code === P2_KEYS.interact) Game.interact(run, run.players[1]);
@@ -151,8 +156,56 @@
     if (keys.KeyW) moveY -= 1;
     if (keys.KeyS) moveY += 1;
     const firing = mouse.down || !!keys.Space;
-    return { moveX: moveX, moveY: moveY, firing: firing, aimX: mouse.x, aimY: mouse.y, interact: false };
+    // The special is a one-press action: it is taken once, then cleared.
+    const special = pendingSpecial[0];
+    pendingSpecial[0] = false;
+    // Track Down: when on, player 1's aim locks onto the nearest enemy, and the gun keeps firing.
+    let aimX = mouse.x;
+    let aimY = mouse.y;
+    if (trackDown && run && run.players[0]) {
+      const target = Game.trackTarget(run, run.players[0]);
+      if (target) {
+        aimX = target.x;
+        aimY = target.y;
+      }
+    }
+    return { moveX: moveX, moveY: moveY, firing: firing, aimX: aimX, aimY: aimY, interact: false, special: special };
   }
+
+  // Track Down for player 1. Toggled by the button on screen or the T key.
+  // Track Down only changes where player 1 aims; the player still holds fire to shoot.
+  let trackDown = false;
+
+  function setTrackDown(value) {
+    trackDown = value;
+    const btn = document.getElementById('track-btn');
+    if (!btn) return;
+    btn.textContent = 'TRACK DOWN: ' + (trackDown ? 'ON' : 'OFF');
+    if (trackDown) btn.classList.add('on');
+    else btn.classList.remove('on');
+  }
+
+  // The button and the T key both use this, so they always agree.
+  function toggleTrackDown() {
+    setTrackDown(!trackDown);
+  }
+
+  // Shows the Track Down button only while a match is being played, not on the menus.
+  function showTrackButton(visible) {
+    const btn = document.getElementById('track-btn');
+    if (!btn) return;
+    if (visible) btn.classList.remove('menu-hidden');
+    else btn.classList.add('menu-hidden');
+  }
+
+  document.getElementById('track-btn').addEventListener('click', function () {
+    toggleTrackDown();
+  });
+
+  // One pending special press per player, set on keydown and consumed by the next input read.
+  const pendingSpecial = [false, false];
+  // Special-ability keys: index 0 is player 1 (Left Shift), index 1 is player 2 (Enter).
+  const SPECIAL_KEYS = ['ShiftLeft', 'Enter'];
 
   // Player 2: arrows + Right Shift fire, auto-aims at the nearest enemy.
   function readP2(p) {
@@ -163,9 +216,12 @@
     if (keys[P2_KEYS.up]) moveY -= 1;
     if (keys[P2_KEYS.down]) moveY += 1;
     const target = nearestEnemy(p);
+    const special = pendingSpecial[1];
+    pendingSpecial[1] = false;
     return {
       moveX: moveX,
       moveY: moveY,
+      special: special,
       firing: !!keys[P2_KEYS.fire] && !!target,
       aimX: target ? target.x : p.x + p.facing * 100,
       aimY: target ? target.y : p.y,
@@ -198,10 +254,11 @@
   }
 
   // Opens the character select screen for a mode. Nothing starts until START is pressed there.
-  function openSelect(mode) {
+  // presetP1 is the character player 1 already chose in the base; it fills slot 1 and the cursor moves to slot 2.
+  function openSelect(mode, presetP1) {
     selectMode = mode;
-    selectPicks = [null, null];
-    selectActive = 0;
+    selectPicks = [presetP1 || null, null];
+    selectActive = presetP1 && mode !== 'solo' ? 1 : 0;
     titleEl.classList.add('hidden');
     overEl.classList.add('hidden');
     selectEl.classList.remove('hidden');
@@ -216,6 +273,9 @@
     run = Game.createRun(null, mode, picks);
     shopPlayer = 0;
     setPaused(false);
+    // Track Down always starts off in a new match, and its button shows during play.
+    setTrackDown(false);
+    showTrackButton(true);
     screen = 'playing';
     selectEl.classList.add('hidden');
     titleEl.classList.add('hidden');
@@ -256,11 +316,57 @@
     localStorage.setItem(SAVE_KEY, JSON.stringify(save));
   }
 
+  // Inside a shop room, E buys the item on the nearest shelf. Dust purchases are saved here,
+  // since the dust balance lives in the save.
+  function buyInRoom(p) {
+    const shelf = Game.nearestShelfItem(run, p);
+    if (!shelf) {
+      say('Walk up to an item and press E');
+      return;
+    }
+    // Owned items cannot be bought again; the room shows them as OWNED.
+    if (Base.isOwned(shelf.item, p, save)) {
+      say(shelf.item.name + ' is already OWNED');
+      return;
+    }
+    const result = Game.buyShelfItem(run, p, save.dust);
+    if (!result.ok) {
+      say(result.reason);
+      return;
+    }
+    // The Super Character: the coins were taken from the run; record the character in the save.
+    if (result.character) {
+      Base.buySuperCharacter(save, result.character);
+      carryRunToSave();
+      say('Bought ' + shelf.item.name + ' for ' + shelf.item.price + ' coins');
+      return;
+    }
+    if (result.dust) {
+      const bought = Base.buyColor(save, result.colour);
+      if (!bought.ok) {
+        say(bought.reason);
+        return;
+      }
+      if (result.colour !== Base.RAINBOW) Base.equipColor(save, result.colour);
+      writeSave();
+      say('Bought ' + shelf.item.name + ' for ' + shelf.item.price + ' dust');
+      return;
+    }
+    carryRunToSave();
+    say('Bought ' + shelf.item.name + ' for ' + shelf.item.price + (shelf.item.currency === 'coins' ? ' coins' : ' dust'));
+    applyGlow(p);
+  }
+
   // Pressing E in the base uses whatever the player is standing at: the portal, a station, or nothing.
   function useBaseSpot(p) {
+    if (run.room) {
+      buyInRoom(p);
+      return;
+    }
     const B = CONFIG.base;
-    if (Base.nearPortal(p)) {
-      enterPortal();
+    const portal = Base.portalAt(p);
+    if (portal) {
+      enterPortal(portal);
       return;
     }
     if (Base.nearPoint(p, B.shop)) {
@@ -390,12 +496,24 @@
     p.glowHex = def ? def.hex : null;
   }
 
-  // Walking into the portal and pressing E sends the player from the base into the real arena.
-  // enterArena starts the first wave itself, so this only has to switch the screen state.
-  function enterPortal() {
-    Game.enterArena(run);
-    hideShop();
-    Sound.play('next');
+  // Pressing E in a portal starts that portal's match.
+  // Solo goes straight into the arena. PvP and Player 2 open the character select for two players;
+  // player 1 keeps the character from the base, and player 2 picks on the select screen.
+  function enterPortal(portal) {
+    if (portal.mode === 'solo') {
+      Game.enterArena(run);
+      hideShop();
+      Sound.play('next');
+      return;
+    }
+    const p1 = run.players[0].character;
+    saveBeforeLeavingBase();
+    openSelect(portal.mode, p1);
+  }
+
+  // Stores the solo run's progress before a two-player match replaces it.
+  function saveBeforeLeavingBase() {
+    carryRunToSave();
   }
 
   // Writes the run's coins and score into the save, so they carry to the base and the next run.
@@ -447,7 +565,12 @@
     const img = assets[assetKey];
     const c2d = canvasEl.getContext('2d');
     c2d.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    if (!img || !img.naturalWidth) return;
+    // Sprite sheets load in the background. If this one is not ready yet, the card waits for its
+    // load event and draws itself then, so it never stays blank.
+    if (!img || !img.complete || !img.naturalWidth) {
+      if (img) img.addEventListener('load', function () { drawCharacterPreview(canvasEl, assetKey); }, { once: true });
+      return;
+    }
     c2d.imageSmoothingEnabled = false;
     c2d.drawImage(img, 0, 0, 64, 64, 0, 0, canvasEl.width, canvasEl.height);
   }
@@ -468,13 +591,19 @@
     }
     slotsEl.innerHTML = slots;
 
+    // Every character is shown. The Super Character is locked until it is bought in the shop:
+    // it shows a lock and its price, and it cannot be picked.
     gridEl.innerHTML = CONFIG.characters.map(function (c) {
+      const locked = !Base.characterUnlocked(save, c.id);
       const takenBy = selectPicks.indexOf(c.id);
       const chosen = takenBy !== -1;
-      const badge = chosen ? 'P' + (takenBy + 1) : '';
-      const disabled = chosen && takenBy !== selectActive;
-      return '<button class="char-card' + (chosen ? ' chosen' : '') + '" data-action="pick:' + c.id + '"' +
+      const badge = locked ? 'Buy in shop: ' + c.cost + ' coins' : (chosen ? 'P' + (takenBy + 1) : '');
+      const disabled = locked || (chosen && takenBy !== selectActive);
+      const cls = 'char-card' + (chosen ? ' chosen' : '') + (locked ? ' locked' : '');
+      const lock = locked ? '<span class="lock" aria-hidden="true">🔒</span>' : '';
+      return '<button class="' + cls + '" data-action="pick:' + c.id + '"' +
         (disabled ? ' disabled' : '') + '>' +
+        lock +
         '<canvas width="72" height="72" data-asset="' + c.asset + '"></canvas>' +
         '<span class="name">' + c.name + '</span>' +
         '<span class="badge">' + badge + '</span></button>';
@@ -519,6 +648,7 @@
   document.getElementById('select-back').addEventListener('click', function () {
     selectEl.classList.add('hidden');
     titleEl.classList.remove('hidden');
+    showTrackButton(false);
     screen = 'title';
   });
 
@@ -531,6 +661,7 @@
 
   function endGame() {
     screen = 'over';
+    showTrackButton(false);
     const title = document.getElementById('gameover-title');
     if (run.mode === 'pvp') {
       title.textContent = run.matchWinner ? run.matchWinner + ' WINS!' : 'MATCH OVER';
@@ -744,7 +875,16 @@
     const ammo = def.melee ? '-' : (CONFIG.infiniteAmmo ? '∞' : p.ammo[p.weapon]);
     const hp = p.down ? 'DOWN' : 'HP ' + p.health + '/' + p.maxHealth;
     const coins = run.mode === 'pvp' ? '  Coins ' + p.coins : '';
-    return p.name + ': ' + hp + '  ' + def.name + ' ' + ammo + coins;
+    return p.name + ': ' + hp + '  ' + def.name + ' ' + ammo + coins + '  ' + specialHudText(p);
+  }
+
+  // The special's name, its key, and READY or the seconds left.
+  function specialHudText(p) {
+    const sp = Game.specialOf(p);
+    if (!sp) return '';
+    const key = p.index === 0 ? 'Left Shift' : 'Enter';
+    const state = p.specialCooldown > 0 ? Math.ceil(p.specialCooldown) + 's' : 'READY';
+    return '[' + sp.name + ' ' + key + ': ' + state + ']';
   }
 
   function updateHud() {
@@ -801,6 +941,7 @@
     document.getElementById('base-back-btn').classList.add('hidden');
     baseShopOpen = false;
     titleEl.classList.remove('hidden');
+    showTrackButton(false);
     hud.textContent = '';
     Sound.stopMusic();
   }
@@ -843,7 +984,13 @@
       // Screen shake offsets the whole scene; the HUD and messages stay still.
       ctx.save();
       if (run.shake > 0) ctx.translate((Math.random() * 2 - 1) * run.shake, (Math.random() * 2 - 1) * run.shake);
-      if (run.phase === 'base') {
+      if (run.phase === 'base' && run.room) {
+        // Inside a shop room: the room view replaces the base floor.
+        drawBaseBackground();
+        const ownedCheck = (item) => Base.isOwned(item, run.players[0], save);
+        Render.drawRoom(ctx, run, run.room, Game.nearestShelfItem(run, run.players[0]), time, ownedCheck);
+        Render.drawPlayers(ctx, run, assets, time);
+      } else if (run.phase === 'base') {
         drawBaseBackground();
         Render.drawBase(ctx, run, time);
       } else {

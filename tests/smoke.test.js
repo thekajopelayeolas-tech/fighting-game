@@ -49,7 +49,7 @@ function makeEl(id) {
 test('browser scripts run for many frames without throwing', () => {
   const root = path.join(__dirname, '..');
   const ids = ['game', 'hud', 'shop', 'title', 'gameover', 'shop-coins', 'shop-upgrades', 'shop-weapons',
-    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour'];
+    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour', 'track-btn'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   const store = {};
@@ -100,7 +100,7 @@ test('PvP versus starts a match and shows both players', () => {
   const root = path.join(__dirname, '..');
   const ids = ['game', 'hud', 'shop', 'title', 'gameover', 'shop-coins', 'shop-upgrades', 'shop-weapons', 'shop-tabs',
     'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best',
-    'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour'];
+    'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour', 'track-btn'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   const store = {};
@@ -140,7 +140,7 @@ test('PvP versus starts a match and shows both players', () => {
 test('2 player co-op runs through the browser code', () => {
   const root = path.join(__dirname, '..');
   const ids = ['game', 'hud', 'shop', 'title', 'gameover', 'shop-coins', 'shop-upgrades', 'shop-weapons', 'shop-tabs',
-    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour'];
+    'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best', 'shop-tabs', 'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label', 'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back', 'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour', 'track-btn'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   const store = {};

@@ -5,9 +5,16 @@
   const FS = CONFIG.sprite.frameSize;
   const PLAYER_COLORS = ['#4cc9f0', '#ff9f1c'];
   // Sprite key for a player's chosen character (falls back to the knight).
-  function characterAsset(p) {
+  // The Super Character cycles through the five character sheets, like the rainbow cycles hues.
+  // The step changes every half second, using the game clock, so the cycle is the same for every viewer.
+  function characterAsset(p, time) {
     const c = CONFIG.characters.find((ch) => ch.id === p.character);
-    return c ? c.asset : 'knight';
+    if (!c) return 'knight';
+    if (c.super && c.cycle) {
+      const step = Math.floor((time || 0) * 2) % c.cycle.length;
+      return c.cycle[step];
+    }
+    return c.asset;
   }
 
   // Tinted frames are cached: one offscreen canvas per sheet, frame, and colour.
@@ -120,7 +127,7 @@
     // The equipped dust colour tints the character. The rainbow cycles through hues over time.
     // Hue moves in 30-degree steps, so the tint cache only holds 12 rainbow frames.
     const tint = p.glow === 'rainbow' ? rainbowHex(Math.floor(time * 4) % 12) : p.glowHex;
-    const drawn = drawSprite(ctx, assets[characterAsset(p)], row, frame, p.x, p.y, size, p.facing < 0, p.glow ? tint : null);
+    const drawn = drawSprite(ctx, assets[characterAsset(p, time)], row, frame, p.x, p.y, size, p.facing < 0, p.glow ? tint : null);
     ctx.restore();
     if (!drawn) {
       ctx.save();
@@ -257,8 +264,101 @@
     drawPracticeRange(ctx, B.practice, time);
     drawDummies(ctx, state);
     drawStations(ctx, B, time);
-    drawPortal(ctx, B.portal, time);
+    for (const id of Object.keys(B.portals)) drawPortal(ctx, B.portals[id], time);
     drawMotes(ctx, time);
+  }
+
+  // Draws a shop room: a lit interior, a counter, and the items on display with their prices.
+  // The item nearest the player shows an "E to buy" prompt. Only reads state.
+  // owned(item) says whether the player already owns an item; owned items show an OWNED tag.
+  function drawRoom(ctx, state, roomId, nearest, time, owned) {
+    const room = CONFIG.base.rooms[roomId];
+    if (!room) return;
+    const r = room.interior;
+    ctx.save();
+    // Room walls and floor.
+    ctx.fillStyle = 'rgba(12, 10, 32, 0.92)';
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+    neon(ctx, '#c77dff', 3, function () {
+      ctx.strokeRect(r.x, r.y, r.w, r.h);
+    });
+    // Counter along the bottom of the room.
+    ctx.fillStyle = 'rgba(199, 125, 255, 0.18)';
+    ctx.fillRect(r.x, r.y + r.h - 110, r.w, 40);
+    // Room name sign.
+    ctx.fillStyle = '#ffd166';
+    ctx.font = 'bold 26px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(room.name, r.x + r.w / 2, r.y + 44);
+    ctx.restore();
+
+    // Items on display, each on a small pedestal with its name and price.
+    const shelves = Game.roomShelves(roomId);
+    for (const s of shelves) {
+      const isNear = nearest && nearest.item.key === s.item.key;
+      const isOwned = owned ? owned(s.item) : false;
+      drawPedestal(ctx, s, isNear, time, isOwned);
+    }
+
+    // The exit, shown as a door at the bottom of the room.
+    ctx.save();
+    ctx.fillStyle = 'rgba(247, 37, 133, 0.35)';
+    ctx.fillRect(room.exit.x - 30, room.exit.y - 30, 60, 60);
+    ctx.fillStyle = '#f1faee';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('EXIT', room.exit.x, room.exit.y + 46);
+    ctx.restore();
+
+    if (nearest) {
+      ctx.save();
+      ctx.fillStyle = '#ffd166';
+      ctx.font = 'bold 18px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('E to buy ' + nearest.item.name + ' - ' + nearest.item.price + ' ' + nearest.item.currency, r.x + r.w / 2, r.y + r.h - 30);
+      ctx.restore();
+    }
+  }
+
+  // One item on display: a pedestal, a swatch or icon, its name, and its price.
+  function drawPedestal(ctx, s, isNear, time, isOwned) {
+    const item = s.item;
+    ctx.save();
+    ctx.fillStyle = isOwned ? 'rgba(29, 49, 87, 0.6)' : 'rgba(29, 49, 87, 0.95)';
+    ctx.fillRect(s.x - 62, s.y - 30, 124, 110);
+    ctx.strokeStyle = isNear ? '#ffd166' : isOwned ? '#70e000' : 'rgba(76, 201, 240, 0.6)';
+    ctx.lineWidth = isNear ? 3 : 2;
+    ctx.strokeRect(s.x - 62, s.y - 30, 124, 110);
+    if (isOwned) {
+      // An OWNED tag across the top of the pedestal; the item below stays visible but dimmed.
+      ctx.fillStyle = '#70e000';
+      ctx.fillRect(s.x - 48, s.y - 42, 96, 20);
+      ctx.fillStyle = '#070b16';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('OWNED', s.x, s.y - 27);
+    }
+    ctx.globalAlpha = isOwned ? 0.6 : 1;
+    // Colour items show their colour as a glowing orb; the rainbow cycles through hues.
+    if (item.kind === 'colour') {
+      const fill = item.rainbow ? 'hsl(' + ((time * 90) % 360) + ', 100%, 60%)' : item.hex;
+      ctx.fillStyle = fill;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y + 8, 18, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = '#f1faee';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(item.kind === 'armour' ? 'ARMOUR' : 'WEAPON', s.x, s.y + 12);
+    }
+    ctx.fillStyle = '#f1faee';
+    ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(item.name, s.x, s.y + 60);
+    ctx.fillStyle = item.currency === 'dust' ? '#c77dff' : '#ffd166';
+    ctx.fillText(item.price + ' ' + item.currency, s.x, s.y + 76);
+    ctx.restore();
   }
 
   // Dark floor with a perspective grid, and a glowing horizon line.
@@ -400,7 +500,7 @@
     ctx.fillStyle = '#f1faee';
     ctx.font = 'bold 15px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('ARENA - press E', portal.x, portal.y + portal.radius + 22);
+    ctx.fillText((portal.label || 'ARENA') + ' - press E', portal.x, portal.y + portal.radius + 22);
     ctx.restore();
   }
 
@@ -523,6 +623,7 @@
     drawEnemies: drawEnemies,
     drawWalls: drawWalls,
     drawBase: drawBase,
+    drawRoom: drawRoom,
     drawProjectiles: drawProjectiles,
     drawSwings: drawSwings,
     drawPickups: drawPickups,

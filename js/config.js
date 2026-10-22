@@ -48,12 +48,19 @@ const CONFIG = {
     ],
   },
   // Playable characters shown on the select screen. Each uses a 64x64 sprite sheet.
+  // Each character has one special ability, used with its key (Q for player 1, Numpad Enter for player 2).
+  // Cooldown is in seconds. The numbers are per special, see the effect in game.js useSpecial.
   characters: [
-    { id: 'knight', name: 'Little Knight', asset: 'knight' },
-    { id: 'bolt', name: 'Bolt the Robot', asset: 'bolt' },
-    { id: 'dino', name: 'Dino Buddy', asset: 'dino' },
-    { id: 'forest', name: 'Forest Ranger', asset: 'forest' },
-    { id: 'frog', name: 'Frog Hero', asset: 'frog' },
+    { id: 'knight', name: 'Little Knight', asset: 'knight', special: { id: 'shieldWall', name: 'Shield Wall', cooldown: 14, duration: 5 } },
+    { id: 'bolt', name: 'Bolt the Robot', asset: 'bolt', special: { id: 'overcharge', name: 'Overcharge', cooldown: 16, duration: 5 } },
+    { id: 'dino', name: 'Dino Buddy', asset: 'dino', special: { id: 'stomp', name: 'Stomp', cooldown: 10, radius: 130, damage: 25, knockback: 160 } },
+    { id: 'forest', name: 'Forest Ranger', asset: 'forest', special: { id: 'heal', name: 'Heal', cooldown: 18, amount: 3 } },
+    { id: 'frog', name: 'Frog Hero', asset: 'frog', special: { id: 'croak', name: 'Croak', cooldown: 12, radius: 200, duration: 4, slow: 0.5 } },
+    // Super Character: unlocked in the SHOP room for coins. Its sprite cycles through all five
+    // characters, and its one special runs all five specials at once.
+    { id: 'super', name: 'Super Character', asset: 'knight', super: true, cost: 500,
+      cycle: ['knight', 'bolt', 'dino', 'forest', 'frog'],
+      special: { id: 'superBurst', name: 'Super Burst', cooldown: 30, parts: ['shieldWall', 'overcharge', 'stomp', 'heal', 'croak'] } },
   ],
   weapons: {
     gun: { name: 'Assault Rifle', damage: 14, cooldown: 0.12, speed: 760, spread: 0.06, range: 620, ammo: 120, pellets: 1, image: 'gun', scale: 0.2, color: '#ffd166' },
@@ -137,11 +144,36 @@ const CONFIG = {
     // Practice dummies cannot hurt the player; they only soak up shots.
     dummyHealth: 100,
     spawn: { x: 220, y: 450 },
-    portal: { x: 1380, y: 450, radius: 60 },
+    // Portals: each starts a different kind of match. Solo goes straight into the arena;
+    // PvP and Player 2 open the character select, with player 1 keeping the base character.
+    portals: {
+      solo: { x: 1380, y: 450, radius: 60, label: 'ARENA', mode: 'solo' },
+      pvp: { x: 1380, y: 260, radius: 50, label: 'PVP', mode: 'pvp' },
+      coop: { x: 1380, y: 640, radius: 50, label: 'PLAYER 2', mode: 'coop' },
+    },
     colorStation: { x: 260, y: 240 },
     dustMachine: { x: 620, y: 240 },
     shop: { x: 980, y: 240 },
     practice: { x: 800, y: 620, w: 520, h: 200 },
+    // Shop rooms. Walking onto a room's door enters it; walking onto the exit leaves.
+    // Items sit on shelves inside the room. Prices come from the shop, colour and rainbow lists.
+    rooms: {
+      shop: {
+        name: 'SHOP', currency: 'coins', door: { x: 980, y: 240, r: 46 },
+        exit: { x: 980, y: 520, r: 40 },
+        interior: { x: 380, y: 170, w: 1200, h: 520 },
+      },
+      colour: {
+        name: 'COLOUR', currency: 'dust', door: { x: 260, y: 240, r: 46 },
+        exit: { x: 260, y: 520, r: 40 },
+        interior: { x: 380, y: 170, w: 1200, h: 520 },
+      },
+      dust: {
+        name: 'DUST', currency: 'dust', door: { x: 620, y: 240, r: 46 },
+        exit: { x: 620, y: 520, r: 40 },
+        interior: { x: 380, y: 170, w: 1200, h: 520 },
+      },
+    },
     // Ten colours of dust. Each is a fixed price, so the list is ordered by how rare it is.
     colors: [
       { id: 'red', name: 'Red', hex: '#e63946', cost: 0 },

@@ -9,7 +9,28 @@
   // A fresh save: one free colour (red), no dust, no coins, and no score yet.
   // coins is the arena money that carries between runs; lifetimeScore adds up every run.
   function newSave() {
-    return { dust: 0, owned: ['red'], color: 'red', bestScore: 0, coins: 0, lifetimeScore: 0 };
+    // characters lists the special characters the player has bought (the Super Character).
+    return { dust: 0, owned: ['red'], color: 'red', bestScore: 0, coins: 0, lifetimeScore: 0, characters: [] };
+  }
+
+  // Records a super character as owned in the save. The coins are taken from the run by the caller
+  // (see buyShelfItem), so this only checks the character and records it. Returns { ok, reason, cost }.
+  function buySuperCharacter(save, id) {
+    const def = CFG.characters.find((c) => c.id === id && c.super);
+    if (!def) return { ok: false, reason: 'Unknown character' };
+    save.characters = Array.isArray(save.characters) ? save.characters : [];
+    if (save.characters.indexOf(id) !== -1) return { ok: false, reason: 'Already owned' };
+    save.characters.push(id);
+    return { ok: true, cost: def.cost };
+  }
+
+  // Whether a character can be picked on the select screen. Normal characters always can;
+  // the Super Character needs to be bought first.
+  function characterUnlocked(save, id) {
+    const def = CFG.characters.find((c) => c.id === id);
+    if (!def) return false;
+    if (!def.super) return true;
+    return !!(save && Array.isArray(save.characters) && save.characters.indexOf(id) !== -1);
   }
 
   // Armour rules. A piece's level is 0 (wood) to 5 (netherite); each level is one tier up.
@@ -34,6 +55,53 @@
     if (pieces.length === 0) return 0;
     const weakest = Math.min.apply(null, pieces);
     return armourTier(weakest).reduction;
+  }
+
+  // Items on display in each room. Every item has a key, a name, a price and a currency.
+  // Prices and names come from the shop, armour, colour and rainbow lists, so there is one source of truth.
+  function roomItems(roomId) {
+    if (roomId === 'shop') {
+      const weapons = CFG.shop.weapons.map((w) => ({
+        key: 'weapon:' + w.id, name: CFG.weapons[w.id].name, price: w.cost, currency: 'coins', kind: 'weapon',
+      }));
+      const armour = CFG.armour.pieces.map((p) => ({
+        key: 'armour:' + p.id, name: p.name, price: p.cost, currency: 'coins', kind: 'armour',
+      }));
+      // The Super Character is sold here too, for coins. It is one item, not a set.
+      const supers = CFG.characters.filter((c) => c.super).map((c) => ({
+        key: 'character:' + c.id, name: c.name, price: c.cost, currency: 'coins', kind: 'character',
+      }));
+      return weapons.concat(armour, supers);
+    }
+    if (roomId === 'colour') {
+      return CFG.base.colors.filter((c) => c.cost > 0).map((c) => ({
+        key: 'colour:' + c.id, name: c.name, price: c.cost, currency: 'dust', kind: 'colour', hex: c.hex,
+      }));
+    }
+    if (roomId === 'dust') {
+      return [{ key: 'colour:' + RAINBOW, name: 'Rainbow', price: CFG.base.rainbowCost, currency: 'dust', kind: 'colour', rainbow: true }];
+    }
+    return [];
+  }
+
+  // Whether the player already owns an item on display. Used by both the room view and the E key,
+  // so an owned item always looks owned and can never be bought again.
+  // p is the player; save holds the owned colours.
+  function isOwned(item, p, save) {
+    if (!item) return false;
+    const id = item.key.split(':')[1];
+    if (item.kind === 'weapon') return !!(p && p.owned && p.owned[id]);
+    if (item.kind === 'armour') return !!(p && p.armour && p.armour[id] >= 0);
+    if (item.kind === 'colour') return !!(save && save.owned && save.owned.indexOf(id) !== -1);
+    if (item.kind === 'character') return !!(save && save.characters && save.characters.indexOf(id) !== -1);
+    return false;
+  }
+
+  // Works out whether a saved balance can pay for an item. Returns { ok, reason }.
+  function canAfford(item, wallets) {
+    const have = item.currency === 'dust' ? wallets.dust : wallets.coins;
+    if (have < item.price) return { ok: false, reason: 'Not enough ' + item.currency };
+    return { ok: true };
   }
 
   // Records what a finished run leaves behind: its coins and its score.
@@ -120,18 +188,32 @@
     return Math.hypot(p.x - point.x, p.y - point.y) <= (reach == null ? 70 : reach);
   }
 
-  // The portal: walking into it (and pressing E) starts the real arena.
+  // The portal the player is standing in, or null. Walking into one and pressing E starts its match.
+  function portalAt(p) {
+    const portals = CFG.base.portals;
+    for (const id of Object.keys(portals)) {
+      const portal = portals[id];
+      if (Math.hypot(p.x - portal.x, p.y - portal.y) <= portal.radius) return Object.assign({ id: id }, portal);
+    }
+    return null;
+  }
+
+  // True when the player is in any portal.
   function nearPortal(p) {
-    const portal = CFG.base.portal;
-    return Math.hypot(p.x - portal.x, p.y - portal.y) <= portal.radius;
+    return portalAt(p) !== null;
   }
 
   const api = {
     RAINBOW: RAINBOW,
     newSave: newSave,
+    buySuperCharacter: buySuperCharacter,
+    characterUnlocked: characterUnlocked,
     carryRun: carryRun,
     carryLoadout: carryLoadout,
     loadoutFor: loadoutFor,
+    roomItems: roomItems,
+    canAfford: canAfford,
+    isOwned: isOwned,
     armourTier: armourTier,
     armourUpgradeCost: armourUpgradeCost,
     armourReduction: armourReduction,
@@ -143,6 +225,7 @@
     makeDummies: makeDummies,
     nearPoint: nearPoint,
     nearPortal: nearPortal,
+    portalAt: portalAt,
   };
 
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
