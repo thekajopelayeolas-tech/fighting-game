@@ -887,16 +887,23 @@
     return '[' + sp.name + ' ' + key + ': ' + state + ']';
   }
 
+  // The last HUD text written, so the page only updates the HUD when its text changes.
+  let lastHudText = '';
+
   function updateHud() {
     const parts = run.players.map(playerHudText);
+    let text;
     if (run.mode === 'pvp') {
       const wins = run.players.map((p) => p.roundWins).join(' - ');
-      hud.textContent = parts.join('   |   ') + '   |   Round ' + (run.round || 1) +
+      text = parts.join('   |   ') + '   |   Round ' + (run.round || 1) +
         '   Wins ' + wins + '   First to ' + CONFIG.versus.roundsToWin;
-      return;
+    } else {
+      text = parts.join('   |   ') + '   |   Wave ' + run.wave +
+        '   Score ' + Math.floor(run.score) + '   Coins ' + run.coins + '   Best ' + bestScore;
     }
-    hud.textContent = parts.join('   |   ') + '   |   Wave ' + run.wave +
-      '   Score ' + Math.floor(run.score) + '   Coins ' + run.coins + '   Best ' + bestScore;
+    if (text === lastHudText) return;
+    lastHudText = text;
+    hud.textContent = text;
   }
 
   function drawMessage() {
@@ -943,6 +950,7 @@
     titleEl.classList.remove('hidden');
     showTrackButton(false);
     hud.textContent = '';
+    lastHudText = '';
     Sound.stopMusic();
   }
 

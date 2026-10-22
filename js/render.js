@@ -246,11 +246,15 @@
   }
 
   // Neon glow: draws a shape with a soft coloured halo behind it.
+  // A soft halo is a wider, faint stroke under the sharp line. Shadow blur is slow to draw every frame.
   function neon(ctx, color, width, draw) {
+    const alpha = ctx.globalAlpha;
     ctx.save();
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 18;
     ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha * 0.18;
+    ctx.lineWidth = width * 4;
+    draw();
+    ctx.globalAlpha = alpha;
     ctx.lineWidth = width;
     draw();
     ctx.restore();

@@ -4,7 +4,7 @@
   "description": "A browser survival shooter with weapons, shops, and power-ups",
   "main": "index.html",
   "scripts": {
-    "test": "node --test tests/game.test.js tests/shop.test.js tests/powerups.test.js tests/smoke.test.js tests/assets.test.js tests/coop.test.js tests/pvp.test.js tests/movement.test.js tests/howto.test.js tests/effects.test.js tests/polish.test.js tests/walls.test.js tests/wall_render.test.js tests/base.test.js tests/colour_tint.test.js tests/base_look.test.js tests/carry.test.js tests/pause_menu.test.js tests/harder.test.js tests/loadout.test.js tests/armour.test.js tests/owned.test.js tests/specials.test.js tests/track_down.test.js tests/super_character.test.js",
+    "test": "node --test tests/game.test.js tests/shop.test.js tests/powerups.test.js tests/smoke.test.js tests/assets.test.js tests/coop.test.js tests/pvp.test.js tests/movement.test.js tests/howto.test.js tests/effects.test.js tests/polish.test.js tests/walls.test.js tests/wall_render.test.js tests/base.test.js tests/colour_tint.test.js tests/base_look.test.js tests/carry.test.js tests/pause_menu.test.js tests/harder.test.js tests/loadout.test.js tests/armour.test.js tests/owned.test.js tests/specials.test.js tests/track_down.test.js tests/super_character.test.js tests/performance.test.js",
     "check": "node --check js/config.js && node --check js/audio.js && node --check js/base.js && node --check js/game.js && node --check js/render.js && node --check js/main.js"
   },
   "license": "UNLICENSED",

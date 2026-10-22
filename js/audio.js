@@ -32,10 +32,25 @@
     if (p && p.catch) p.catch(function () {});
   }
 
+  // Each sound keeps a small pool of audio elements, reused in turn, instead of creating a new one per play.
+  const POOL_SIZE = 4;
+  const pools = {};
+
   function play(name) {
     const def = SOUNDS[name];
     if (!def || muted || !hasAudio()) return;
-    const el = new Audio(def.file);
+    let pool = pools[name];
+    if (!pool) pool = pools[name] = { els: [], next: 0 };
+    let el;
+    if (pool.els.length < POOL_SIZE) {
+      el = new Audio(def.file);
+      pool.els.push(el);
+    } else {
+      el = pool.els[pool.next];
+      pool.next = (pool.next + 1) % POOL_SIZE;
+      el.pause();
+      el.currentTime = 0;
+    }
     el.volume = def.volume;
     safePlay(el);
   }
