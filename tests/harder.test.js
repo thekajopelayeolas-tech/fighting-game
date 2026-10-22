@@ -89,8 +89,8 @@ test('the Overlord splits into a ring of dashers below half health, only once', 
   assert.equal(s.enemies.filter((e) => e.type === 'dasher').length, 8, 'the split should only happen once');
 });
 
-test('the dasher has its own tint, and the renderer applies sprite tints', () => {
-  assert.ok(CFG.enemies.dasher.sprite.tint, 'the dasher has its own tint');
+test('the dasher keeps the spike ball colours, and the renderer applies sprite tints', () => {
+  assert.equal(CFG.enemies.dasher.sprite.tint, undefined, 'the dasher should not be tinted');
   const render = fs.readFileSync(path.join(root, 'js/render.js'), 'utf8');
   assert.ok(render.indexOf('spr.tint') !== -1, 'the renderer applies sprite tints');
 });

@@ -77,7 +77,7 @@ const CONFIG = {
     brute: { name: 'Brute', health: 120, speed: 45, damage: 2, radius: 24, color: '#e63946', score: 40, xp: 3, sprite: { image: 'brute', whole: true, height: 110 } },
     boss: { name: 'Overlord', health: 900, speed: 55, damage: 2, radius: 46, color: '#ff006e', score: 500, xp: 15, sprite: { image: 'roboGuard', frames: 7, frameSize: 48 } },
     // Dasher: fast and fragile. Fast enough to punish standing still.
-    dasher: { name: 'Dasher', health: 14, speed: 185, damage: 1, radius: 10, color: '#ffd166', score: 20, xp: 2, sprite: { image: 'spikeBall', frames: 7, frameSize: 32, tint: '#ffd166' } },
+    dasher: { name: 'Dasher', health: 14, speed: 185, damage: 1, radius: 10, color: '#ffd166', score: 20, xp: 2, sprite: { image: 'spikeBall', frames: 7, frameSize: 32 } },
     // Armoured: slow and tough. Every hit does less damage to it (armour), so it needs sustained fire.
     armoured: { name: 'Armoured', health: 220, speed: 38, damage: 2, radius: 26, color: '#adb5bd', score: 60, xp: 4, armour: 0.35, sprite: { image: 'brute', whole: true, height: 96 } },
   },
