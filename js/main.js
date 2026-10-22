@@ -71,8 +71,8 @@
 
   renderBackgroundChoices();
 
-  // Player 2 controls: arrows move, Right Shift fires, Right Ctrl interacts, Numpad 0 switches weapons.
-  const P2_KEYS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', fire: 'ShiftRight', interact: 'ControlRight', cycle: 'Numpad0' };
+  // Player 2 controls: arrows move, Right Shift fires, M interacts, Numpad 0 switches weapons.
+  const P2_KEYS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', fire: 'ShiftRight', interact: 'KeyM', cycle: 'Numpad0' };
 
   function toCanvas(e) {
     const r = canvas.getBoundingClientRect();
@@ -81,7 +81,7 @@
 
   window.addEventListener('keydown', function (e) {
     keys[e.code] = true;
-    if (e.code === 'KeyM') Sound.toggleMute();
+    if (e.code === 'KeyN') Sound.toggleMute();
     if (!document.getElementById('howto').classList.contains('hidden')) {
       if (e.code === 'Escape' || e.code === 'Enter') document.getElementById('howto').classList.add('hidden');
       return;
@@ -246,7 +246,7 @@
     return best;
   }
 
-  // Keyboard-held interact keys are one-shot, so E/Right Ctrl only fire on keydown.
+  // Keyboard-held interact keys are one-shot, so E/M only fire on keydown.
   function readInputs() {
     const list = [readP1()];
     if (playerCount === 2) list.push(readP2(run.players[1]));
