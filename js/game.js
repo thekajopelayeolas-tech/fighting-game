@@ -3,6 +3,8 @@
   'use strict';
 
   const CFG = typeof module !== 'undefined' && module.exports ? require('./config.js') : CONFIG;
+  // Keeps pickups in the arena a bit away from the top and bottom edges (used by PvP pickups).
+  const H_MARGIN = 80;
 
   function createRng(seed) {
     let s = seed >>> 0;
@@ -60,6 +62,8 @@
       owned: { gun: true },
       ammo: { gun: CFG.weapons.gun.ammo },
       upgrades: { maxHealth: 0, damage: 0, speed: 0, ammo: 0 },
+      // Armour level per piece: 0 is wood, 5 is netherite.
+      armour: { helmet: -1, chestplate: -1, leggings: -1, boots: -1 },
       powerUps: {},
       coins: 0,
       roundWins: 0,
@@ -101,6 +105,9 @@
       spawnTimer: 0,
       nextId: 1,
       swings: [],
+      effects: [],
+      walls: [],
+      shake: 0,
       events: [],
     };
   }
@@ -139,15 +146,54 @@
     };
   }
 
+  // Enemy mix by wave. Later waves bring the tougher and faster enemies in, so each wave feels new.
   function pickEnemyType(state) {
     const r = state.rng();
-    if (state.wave >= 3 && r < 0.2) return 'brute';
-    if (state.wave >= 2 && r < 0.5) return 'bat';
+    if (state.wave >= 6 && r < 0.14) return 'armoured';
+    if (state.wave >= 4 && r < 0.3) return 'dasher';
+    if (state.wave >= 3 && r < 0.45) return 'brute';
+    if (state.wave >= 2 && r < 0.65) return 'bat';
     return 'slime';
+  }
+
+  // Starts the base hub for a solo player: no enemies, no waves, practice dummies to shoot.
+  // The base is not a fight, so the phase is 'base' and update() only moves and shoots.
+  function startBase(state) {
+    state.mode = 'base';
+    state.phase = 'base';
+    state.inBase = true;
+    state.enemies = [];
+    state.spawnQueue = [];
+    state.walls = [];
+    const p = state.players[0];
+    p.x = CFG.base.spawn.x;
+    p.y = CFG.base.spawn.y;
+    p.down = false;
+    p.health = p.maxHealth;
+    state.dummies = (typeof Base !== 'undefined' ? Base : require('./base.js')).makeDummies();
+  }
+
+  // Leaves the base and starts the real arena wave, as a normal solo run.
+  function enterArena(state) {
+    state.mode = 'solo';
+    state.inBase = false;
+    state.dummies = [];
+    state.players[0].x = CFG.world.width / 2;
+    state.players[0].y = CFG.world.height / 2;
+    startNextWave(state);
   }
 
   function startNextWave(state) {
     const w = CFG.waves;
+    // A PvP match starts here rather than in startVersusRound, so its first round needs walls too.
+    if (state.mode === 'pvp') {
+      buildWalls(state);
+      state.round = (state.round || 0) + 1;
+      say(state, 'Round ' + state.round, 2);
+      state.phase = 'fighting';
+      state.events.push('next');
+      return;
+    }
     state.wave += 1;
     state.phase = 'fighting';
     // Downed players get back up with 1 HP when a new wave starts.
@@ -179,8 +225,9 @@
       case 2: x = rng() * W.width; y = W.height + 30; break;
       default: x = -30; y = rng() * W.height; break;
     }
-    const maxHealth = Math.round(def.health * (1 + 0.12 * (state.wave - 1)));
-    const speedMult = Math.min(1.8, 1 + 0.04 * (state.wave - 1));
+    const w = CFG.waves;
+    const maxHealth = Math.round(def.health * (1 + w.healthPerWave * (state.wave - 1)));
+    const speedMult = Math.min(w.speedCap, 1 + w.speedPerWave * (state.wave - 1));
     state.enemies.push({
       id: state.nextId++,
       type: type,
@@ -197,14 +244,55 @@
     });
   }
 
+  // Visual effects live in state.effects. They use fixed angles, not the seeded rng,
+  // so adding them never changes what a seeded run spawns.
+  function spawnSparks(state, x, y, count, color) {
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2 + state.time;
+      const speed = 90 + 40 * (i % 3);
+      const life = CFG.effects.sparkLife;
+      state.effects.push({
+        kind: 'spark', x: x, y: y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
+        life: life, maxLife: life, color: color,
+      });
+    }
+  }
+
+  function spawnPopup(state, x, y, text, color) {
+    const life = CFG.effects.popupLife;
+    state.effects.push({ kind: 'text', x: x, y: y, vx: 0, vy: -55, text: text, life: life, maxLife: life, color: color });
+  }
+
+  // Moves sparks and popups, expires them, and fades the screen shake.
+  function updateEffects(state, dt) {
+    state.shake = Math.max(0, state.shake - CFG.effects.shakeDecay * dt);
+    const drag = Math.pow(0.02, dt);
+    for (const fx of state.effects) {
+      fx.life -= dt;
+      fx.x += fx.vx * dt;
+      fx.y += fx.vy * dt;
+      if (fx.kind === 'spark') {
+        fx.vx *= drag;
+        fx.vy *= drag;
+      }
+    }
+    state.effects = state.effects.filter((fx) => fx.life > 0);
+  }
+
   // shooter is the player who dealt the hit. In co-op, that player earns the kill coin.
   function damageEnemy(state, e, amount, shooter) {
     if (e.dead) return;
+    // Armour soaks up part of every hit. Enemies without armour take the full amount.
+    const armour = CFG.enemies[e.type].armour || 0;
+    amount = amount * (1 - armour);
     e.health -= amount;
     e.hitFlash = 0.1;
+    spawnSparks(state, e.x, e.y, CFG.effects.hitSparks, '#ffe066');
+    spawnPopup(state, e.x, e.y - e.radius, String(Math.round(amount)), '#ffffff');
     if (e.health <= 0) {
       e.dead = true;
       const def = CFG.enemies[e.type];
+      spawnSparks(state, e.x, e.y, CFG.effects.deathSparks, def.color);
       state.kills += 1;
       state.score += def.score;
       if (state.mode === 'coop' && shooter) {
@@ -217,11 +305,27 @@
     }
   }
 
+  // Damage reduction a player gets from their armour. Uses the same rule as the base module.
+  // A piece that is not bought yet is level -1. Reduction only applies when all four pieces are owned,
+  // and then the weakest piece sets the tier, so a half-upgraded set protects like its weakest piece.
+  function armourReductionOf(p) {
+    if (!p.armour) return 0;
+    const levels = CFG.armour.pieces.map((piece) => p.armour[piece.id]);
+    if (levels.some((level) => level === undefined || level < 0)) return 0;
+    const weakest = Math.min.apply(null, levels);
+    const tier = CFG.armour.tiers[Math.max(0, Math.min(CFG.armour.tiers.length - 1, weakest))];
+    return tier.reduction;
+  }
+
   // Returns true when the hit landed.
   function damagePlayer(state, p, amount) {
     if (state.phase !== 'fighting' || p.down || p.invuln > 0 || p.powerUps.shield > 0) return false;
-    p.health = Math.max(0, p.health - amount);
+    // Armour cuts the damage before it lands. Health never goes below zero from one hit.
+    const reduced = Math.max(0, amount * (1 - armourReductionOf(p)));
+    p.health = Math.max(0, p.health - reduced);
     p.invuln = CFG.player.invulnTime;
+    state.shake = Math.max(state.shake, CFG.effects.shake);
+    state.events.push('hurt');
     if (p.health <= 0) {
       p.down = true;
       if (state.mode === 'pvp') {
@@ -244,6 +348,10 @@
     if (target.invuln > 0 || target.powerUps.shield > 0) return false;
     target.health = Math.max(0, target.health - amount);
     target.invuln = 0.2;
+    // Sparks take the shooter's player colour, matching the rest of the UI.
+    spawnSparks(state, target.x, target.y, CFG.effects.hitSparks, shooter.index === 0 ? '#4cc9f0' : '#ff9f1c');
+    spawnPopup(state, target.x, target.y - target.radius, String(amount), '#ffffff');
+    state.shake = Math.max(state.shake, CFG.effects.shake / 2);
     shooter.coins += CFG.versus.coinsPerHit;
     state.events.push('coin');
     if (target.health <= 0) {
@@ -270,6 +378,54 @@
     state.events.push('next');
   }
 
+  // PvP walls. Each wall is a list of tile-sized blocks laid end to end, horizontal or vertical.
+  // Walls are placed from the seeded rng, so a seeded match always gets the same layout.
+  // A wall never comes within spawnClearance of either player's starting spot, and walls never overlap.
+  function buildWalls(state) {
+    const cfg = CFG.versus.walls;
+    const W = CFG.world;
+    const size = cfg.tile * cfg.length;
+    const spawns = [W.width * 0.25, W.width * 0.75];
+    const walls = [];
+    let attempts = 0;
+    while (walls.length < cfg.count && attempts < 500) {
+      attempts += 1;
+      const horizontal = state.rng() < 0.5;
+      const w = horizontal ? size : cfg.tile;
+      const h = horizontal ? cfg.tile : size;
+      const x = CFG.player.radius + state.rng() * (W.width - w - 2 * CFG.player.radius);
+      const y = H_MARGIN + state.rng() * (W.height - h - 2 * H_MARGIN);
+      const rect = { x: x, y: y, w: w, h: h };
+      if (spawns.some((sx) => rectNearPoint(rect, sx, W.height / 2, cfg.spawnClearance))) continue;
+      if (walls.some((other) => rectsOverlap(rect, other))) continue;
+      walls.push(rect);
+    }
+    state.walls = walls;
+  }
+
+  // True when the rectangle is within `reach` pixels of the point.
+  function rectNearPoint(rect, px, py, reach) {
+    const nx = clamp(px, rect.x, rect.x + rect.w);
+    const ny = clamp(py, rect.y, rect.y + rect.h);
+    return dist(px, py, nx, ny) < reach;
+  }
+
+  function rectsOverlap(a, b) {
+    const pad = CFG.versus.walls.tile;
+    return a.x < b.x + b.w + pad && a.x + a.w + pad > b.x && a.y < b.y + b.h + pad && a.y + a.h + pad > b.y;
+  }
+
+  // True when a circle of radius r at (x, y) touches any wall.
+  function hitsWall(state, x, y, r) {
+    if (!state.walls) return false;
+    for (const wall of state.walls) {
+      const nx = clamp(x, wall.x, wall.x + wall.w);
+      const ny = clamp(y, wall.y, wall.y + wall.h);
+      if (dist(x, y, nx, ny) < r) return true;
+    }
+    return false;
+  }
+
   // Starts the next PvP round: both players are reset and the arena is cleared.
   function startVersusRound(state) {
     for (const p of state.players) {
@@ -287,6 +443,7 @@
     state.projectiles = [];
     state.pickups = [];
     state.swings = [];
+    buildWalls(state);
     state.round = (state.round || 0) + 1;
     state.phase = 'fighting';
     say(state, 'Round ' + state.round, 2);
@@ -315,7 +472,8 @@
 
   function applyPickup(state, pk, p) {
     const tag = labelFor(state, p);
-    state.events.push(pk.kind === 'weapon' ? 'select' : 'coin');
+    const sound = pk.kind === 'weapon' ? 'select' : pk.kind === 'powerUp' ? 'powerUp' : 'coin';
+    state.events.push(sound);
     if (pk.kind === 'heal') {
       const amount = CFG.powerUps.heal.amount;
       p.health = Math.min(p.maxHealth, p.health + amount);
@@ -384,6 +542,7 @@
   }
 
   function swing(state, p, def, st, aimAngle) {
+    p.swingTime = CFG.sprite.swingPose;
     state.swings.push({ x: p.x, y: p.y, angle: aimAngle, life: 0.18, range: def.range, arc: def.arc, color: def.color });
     state.events.push('swing');
     if (state.mode === 'pvp') {
@@ -453,9 +612,36 @@
   }
 
   // Enemies chase the nearest standing player and hit anyone they touch.
+  // The Overlord releases a ring of Dashers the first time its health drops below half.
+  function bossSplit(state, boss) {
+    if (boss.type !== 'boss' || boss.split || boss.health > boss.maxHealth * 0.5) return;
+    boss.split = true;
+    const count = 8;
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2;
+      state.enemies.push({
+        id: state.nextId++,
+        type: 'dasher',
+        x: boss.x + Math.cos(a) * (boss.radius + 20),
+        y: boss.y + Math.sin(a) * (boss.radius + 20),
+        radius: CFG.enemies.dasher.radius,
+        health: CFG.enemies.dasher.health,
+        maxHealth: CFG.enemies.dasher.health,
+        speed: CFG.enemies.dasher.speed,
+        damage: CFG.enemies.dasher.damage,
+        attackCd: 0,
+        hitFlash: 0,
+        dead: false,
+      });
+    }
+    state.events.push('drop');
+    spawnSparks(state, boss.x, boss.y, CFG.effects.deathSparks, CFG.enemies.boss.color);
+  }
+
   function updateEnemies(state, dt) {
     for (const e of state.enemies) {
       if (e.dead) continue;
+      bossSplit(state, e);
       e.attackCd = Math.max(0, e.attackCd - dt);
       e.hitFlash = Math.max(0, e.hitFlash - dt);
       const target = nearestLiving(state, e.x, e.y);
@@ -482,6 +668,11 @@
       pr.x += pr.vx * dt;
       pr.y += pr.vy * dt;
       pr.life -= dt;
+      // Walls stop every projectile, including the sniper's piercing shot.
+      if (hitsWall(state, pr.x, pr.y, 3)) {
+        pr.life = 0;
+        continue;
+      }
       if (state.mode === 'pvp') {
         const owner = pr.owner;
         for (const other of state.players) {
@@ -522,6 +713,7 @@
   }
 
   function tickPlayer(p, dt) {
+    p.swingTime = Math.max(0, (p.swingTime || 0) - dt);
     for (const id of Object.keys(p.powerUps)) {
       p.powerUps[id] -= dt;
       if (p.powerUps[id] <= 0) delete p.powerUps[id];
@@ -530,7 +722,7 @@
     p.cooldown = Math.max(0, p.cooldown - dt);
   }
 
-  function movePlayer(p, dt, input) {
+  function movePlayer(p, dt, input, state) {
     const W = CFG.world;
     if (p.down) {
       p.moving = false;
@@ -544,8 +736,11 @@
       mx /= len;
       my /= len;
     }
-    p.x = clamp(p.x + mx * st.speed * dt, CFG.player.radius, W.width - CFG.player.radius);
-    p.y = clamp(p.y + my * st.speed * dt, CFG.player.radius, W.height - CFG.player.radius);
+    // Move one axis at a time, so the player slides along a wall instead of sticking to it.
+    const nx = clamp(p.x + mx * st.speed * dt, CFG.player.radius, W.width - CFG.player.radius);
+    if (!hitsWall(state, nx, p.y, p.radius)) p.x = nx;
+    const ny = clamp(p.y + my * st.speed * dt, CFG.player.radius, W.height - CFG.player.radius);
+    if (!hitsWall(state, p.x, ny, p.radius)) p.y = ny;
     p.moving = len > 0.01;
     if (mx < -0.01) p.facing = -1;
     else if (mx > 0.01) p.facing = 1;
@@ -553,8 +748,47 @@
   }
 
   // inputs: an array with one entry per player, or a single object for player 1.
+  // The base is a safe hub: the player walks, shoots practice dummies, and nothing can hurt them.
+  function updateBase(state, dt, inputs) {
+    const list = Array.isArray(inputs) ? inputs : [inputs || {}];
+    const p = state.players[0];
+    const input = list[0] || {};
+    tickPlayer(p, dt);
+    movePlayer(p, dt, input, state);
+    if (input.firing && p.cooldown <= 0) fire(state, input.aimX, input.aimY, p);
+    // Dummies take hits and never attack; they reset to full health when they die.
+    for (const d of state.dummies || []) {
+      if (d.health < d.maxHealth) d.health = Math.min(d.maxHealth, d.health + dt * 4);
+    }
+    state.projectiles = state.projectiles.filter((pr) => {
+      pr.x += pr.vx * dt;
+      pr.y += pr.vy * dt;
+      pr.life -= dt;
+      for (const d of state.dummies || []) {
+        if (pr.hitIds.indexOf(d.id) !== -1) continue;
+        if (dist(pr.x, pr.y, d.x, d.y) < 24) {
+          pr.hitIds.push(d.id);
+          d.health = Math.max(0, d.health - pr.damage);
+          spawnPopup(state, d.x, d.y - 28, String(Math.round(pr.damage)), '#ffffff');
+          pr.life = 0;
+        }
+      }
+      return pr.life > 0 && pr.x > -50 && pr.x < CFG.world.width + 50 && pr.y > -50 && pr.y < CFG.world.height + 50;
+    });
+    updateEffects(state, dt);
+  }
+
+  // inputs: an array with one entry per player, or a single object for player 1.
   function update(state, dt, inputs) {
-    if (state.phase !== 'fighting') return;
+    if (state.phase === 'base') {
+      updateBase(state, dt, inputs);
+      return;
+    }
+    // Effects keep fading during the shop and between waves, so nothing freezes on screen.
+    if (state.phase !== 'fighting') {
+      updateEffects(state, dt);
+      return;
+    }
     const list = Array.isArray(inputs) ? inputs : [inputs || {}];
     state.time += dt;
     if (state.mode !== 'pvp') state.score += dt;
@@ -563,7 +797,7 @@
       const p = state.players[i];
       const input = list[i] || {};
       tickPlayer(p, dt);
-      movePlayer(p, dt, input);
+      movePlayer(p, dt, input, state);
       if (input.firing && p.cooldown <= 0) fire(state, input.aimX, input.aimY, p);
       if (input.interact) interact(state, p);
       collectPowerUps(state, p);
@@ -581,6 +815,7 @@
     }
     updateEnemies(state, dt);
     updateProjectiles(state, dt);
+    updateEffects(state, dt);
     state.enemies = state.enemies.filter((e) => !e.dead);
     state.pickups = state.pickups.filter((pk) => {
       pk.life -= dt;
@@ -594,8 +829,6 @@
       onWaveCleared(state);
     }
   }
-
-  const H_MARGIN = 80;
 
   // PvP keeps a few pickups in the arena so the fight stays lively.
   function updatePvpPickups(state, dt) {
@@ -664,6 +897,38 @@
     return { ok: true, cost: entry.cost };
   }
 
+  // Buys an armour piece at wood (level 0). Costs the piece's base price. Returns { ok, reason, cost }.
+  function buyArmour(state, pieceId, p) {
+    p = p || state.player;
+    const piece = CFG.armour.pieces.find((x) => x.id === pieceId);
+    if (!piece) return { ok: false, reason: 'Unknown armour' };
+    p.armour = p.armour || { helmet: -1, chestplate: -1, leggings: -1, boots: -1 };
+    if (p.armour[pieceId] >= 0) return { ok: false, reason: 'Already owned' };
+    const wallet = walletOf(state, p);
+    if (wallet.coins < piece.cost) return { ok: false, reason: 'Not enough coins' };
+    wallet.coins -= piece.cost;
+    p.armour[pieceId] = 0;
+    return { ok: true, cost: piece.cost };
+  }
+
+  // Upgrades an owned armour piece one tier. The cost depends on the piece's current level.
+  function upgradeArmour(state, pieceId, p) {
+    p = p || state.player;
+    const piece = CFG.armour.pieces.find((x) => x.id === pieceId);
+    if (!piece) return { ok: false, reason: 'Unknown armour' };
+    p.armour = p.armour || { helmet: -1, chestplate: -1, leggings: -1, boots: -1 };
+    const level = p.armour[pieceId];
+    if (level < 0) return { ok: false, reason: 'Buy it first' };
+    const max = CFG.armour.tiers.length - 1;
+    if (level >= max) return { ok: false, reason: 'Already netherite' };
+    const cost = CFG.armour.upgradeStart + CFG.armour.upgradeStep * level;
+    const wallet = walletOf(state, p);
+    if (wallet.coins < cost) return { ok: false, reason: 'Not enough coins' };
+    wallet.coins -= cost;
+    p.armour[pieceId] = level + 1;
+    return { ok: true, cost: cost, tier: CFG.armour.tiers[level + 1].name };
+  }
+
   function equipWeapon(state, id, p) {
     p = p || state.player;
     if (!p.owned[id]) return false;
@@ -683,9 +948,14 @@
     endRound: endRound,
     walletOf: walletOf,
     update: update,
+    startBase: startBase,
+    enterArena: enterArena,
     buyUpgrade: buyUpgrade,
     buyWeapon: buyWeapon,
     equipWeapon: equipWeapon,
+    buyArmour: buyArmour,
+    upgradeArmour: upgradeArmour,
+    armourReductionOf: armourReductionOf,
     upgradeCost: upgradeCost,
     fire: fire,
     interact: interact,

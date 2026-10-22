@@ -39,6 +39,10 @@ body {
   font-size: 15px;
   letter-spacing: 0.5px;
   background: rgba(7, 11, 22, 0.6);
+  background: linear-gradient(90deg, rgba(7, 11, 22, 0.8), rgba(20, 33, 61, 0.7));
+  border: 1px solid rgba(76, 201, 240, 0.35);
+  box-shadow: 0 0 18px rgba(76, 201, 240, 0.2);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   border-radius: 8px;
   pointer-events: none;
 }
@@ -61,6 +65,8 @@ body {
   text-align: center;
   padding: 28px 36px;
   max-width: 90%;
+  max-height: 96%;
+  overflow-y: auto;
   border-radius: 18px;
   background: rgba(20, 33, 61, 0.9);
   border: 2px solid rgba(76, 201, 240, 0.4);
@@ -114,6 +120,12 @@ body {
 .big-btn:hover { filter: brightness(1.08); }
 .big-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #b86b00; }
 
+/* The shop is taller than the screen once the armour rows are added, so it scrolls inside the frame. */
+.shop-card {
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #4cc9f0 rgba(7, 11, 22, 0.6);
+}
 .shop-card h2 { margin: 0 0 8px; font-size: 30px; letter-spacing: 2px; }
 .shop-card h3 { margin: 14px 0 6px; font-size: 14px; text-transform: uppercase; opacity: 0.7; }
 .coins { color: #ffd166; font-size: 18px; margin-left: 12px; }
@@ -152,6 +164,117 @@ body {
 .big-btn.back { background: linear-gradient(180deg, #8d99ae, #495867); box-shadow: 0 6px 0 #2b3a47; color: #f1faee; }
 .big-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.6); }
 
+/* Pause menu: a centred card with RESUME and MAIN MENU. */
+.pause-card { min-width: 320px; }
+.pause-title { margin: 0 0 18px; font-size: 40px; letter-spacing: 4px; color: #ffd166; }
+.pause-card .hint { margin-top: 16px; }
+
+/* Base hub panels: colour list, dust machine. */
+.base-card {
+  text-align: center;
+  padding: 24px 30px;
+  min-width: 360px;
+  max-width: 90%;
+  max-height: 88%;
+  overflow-y: auto;
+  border-radius: 18px;
+  background: rgba(20, 33, 61, 0.95);
+  border: 2px solid rgba(76, 201, 240, 0.4);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+.base-card h2 { margin: 0 0 14px; font-size: 26px; letter-spacing: 2px; }
+.base-body { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.base-body p { margin: 4px 0; font-size: 14px; opacity: 0.9; }
+.base-row {
+  font: inherit;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 2px solid rgba(76, 201, 240, 0.4);
+  background: #1d3157;
+  color: #f1faee;
+  cursor: pointer;
+  text-align: left;
+}
+.base-row:hover:not(:disabled) { border-color: #ffd166; }
+.base-row:disabled { opacity: 0.5; cursor: not-allowed; }
+.base-row.on { border-color: #ffd166; box-shadow: 0 0 12px rgba(255, 209, 102, 0.4); }
+.base-row .name { flex: 1; font-weight: bold; }
+.base-row .cost { font-size: 12px; opacity: 0.85; }
+.base-row .swatch { width: 26px; height: 26px; border-radius: 6px; border: 2px solid rgba(255, 255, 255, 0.4); }
+.base-row .swatch.rainbow { background: linear-gradient(90deg, #f94144, #f3722c, #f9c74f, #90be6d, #43aa8b, #577590, #9d4edd); }
+
+/* Title screen: a fighting scene behind the menu, with the words and buttons on the left. */
+#title {
+  justify-content: flex-start;
+  background:
+    linear-gradient(90deg, rgba(7, 11, 22, 0.92) 0%, rgba(7, 11, 22, 0.7) 38%, rgba(7, 11, 22, 0.1) 70%),
+    url('../assets/backgrounds/fight_scene.png') center / cover no-repeat;
+  backdrop-filter: none;
+}
+#title .title-card {
+  text-align: left;
+  margin-left: clamp(24px, 6vw, 110px);
+  padding: 0;
+  max-width: min(520px, 46%);
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+#title .title-text {
+  font-size: clamp(44px, 7vw, 96px);
+  line-height: 0.95;
+  margin-bottom: 14px;
+  text-shadow: 0 4px 0 #070b16, 0 0 28px rgba(247, 37, 133, 0.45);
+}
+#title .subtitle {
+  margin: 0 0 24px;
+  font-size: clamp(15px, 1.6vw, 20px);
+  letter-spacing: 1px;
+  opacity: 0.92;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+#title .btn-row {
+  justify-content: flex-start;
+  gap: 12px;
+}
+#title .big-btn {
+  font-size: clamp(16px, 1.6vw, 20px);
+  padding: 12px 26px;
+  text-transform: uppercase;
+}
+#title .bg-picker h3 { text-align: left; }
+#title .bg-choices { justify-content: flex-start; }
+#title .hint { text-align: left; margin-top: 18px; }
+#title .big-btn.howto { margin-top: 12px; }
+
+.bg-picker { margin-top: 18px; }
+.bg-picker h3 { margin: 0 0 8px; font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: #ffd166; }
+.bg-choices { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 10px; }
+.bg-choice {
+  font: inherit;
+  font-size: 12px;
+  font-weight: bold;
+  width: 120px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 2px solid rgba(76, 201, 240, 0.4);
+  background: #1d3157;
+  color: #f1faee;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.bg-choice img { width: 108px; height: 60px; object-fit: cover; border-radius: 6px; image-rendering: pixelated; }
+.bg-choice:hover { border-color: #ffd166; }
+.bg-choice.selected { border-color: #ffd166; box-shadow: 0 0 14px rgba(255, 209, 102, 0.45); }
+.big-btn.random { font-size: 15px; padding: 8px 26px; background: linear-gradient(180deg, #b8c0ff, #6c63ff); box-shadow: 0 6px 0 #3f37a6; color: #fff; }
+.big-btn.random:active { box-shadow: 0 2px 0 #3f37a6; }
+
 .big-btn.howto { margin-top: 14px; background: linear-gradient(180deg, #b8c0ff, #6c63ff); box-shadow: 0 6px 0 #3f37a6, 0 10px 24px rgba(108, 99, 255, 0.3); color: #fff; font-size: 16px; padding: 10px 28px; }
 .big-btn.howto:active { box-shadow: 0 2px 0 #3f37a6; }
 
@@ -180,6 +303,8 @@ body {
   text-align: center;
   padding: 24px 30px;
   max-width: 94%;
+  max-height: 94%;
+  overflow-y: auto;
   border-radius: 18px;
   background: rgba(20, 33, 61, 0.92);
   border: 2px solid rgba(76, 201, 240, 0.4);

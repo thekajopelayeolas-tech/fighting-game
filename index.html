@@ -20,6 +20,11 @@
           <button id="start-coop-btn" class="big-btn coop">2 PLAYERS</button>
           <button id="start-pvp-btn" class="big-btn pvp">PVP VERSUS</button>
         </div>
+        <div class="bg-picker">
+          <h3>Arena background</h3>
+          <div id="bg-choices" class="bg-choices"></div>
+          <button id="bg-random" class="big-btn random">RANDOM</button>
+        </div>
         <p class="hint">PvP: first to 3 round wins. Hit your rival to earn coins. Each player has their own shop.</p>
         <button id="howto-btn" class="big-btn howto">HOW TO PLAY</button>
       </div>
@@ -75,7 +80,28 @@
         <div id="shop-upgrades" class="shop-grid"></div>
         <h3>Weapons</h3>
         <div id="shop-weapons" class="shop-grid"></div>
+        <h3>Armour</h3>
+        <div id="shop-armour" class="shop-grid"></div>
         <button id="next-wave-btn" class="big-btn">NEXT WAVE</button>
+      </div>
+    </div>
+
+    <div id="pause" class="overlay hidden">
+      <div class="title-card pause-card">
+        <h2 class="pause-title">PAUSED</h2>
+        <div class="btn-row">
+          <button id="pause-resume-btn" class="big-btn">RESUME</button>
+          <button id="pause-menu-btn" class="big-btn back">MAIN MENU</button>
+        </div>
+        <p class="hint">P or Esc also resumes</p>
+      </div>
+    </div>
+
+    <div id="base-panel" class="overlay hidden">
+      <div class="base-card">
+        <h2 id="base-panel-title">BASE</h2>
+        <div id="base-panel-body" class="base-body"></div>
+        <button id="base-panel-close" class="big-btn back">CLOSE</button>
       </div>
     </div>
 
@@ -84,13 +110,17 @@
         <h1 id="gameover-title" class="title-text over">GAME OVER</h1>
         <p><span id="final-score-label">Score</span> <strong id="final-score">0</strong> &middot; <span id="final-wave-label">Wave</span> <strong id="final-wave">0</strong></p>
         <p><span id="final-best-label">Best</span> <strong id="final-best">0</strong></p>
-        <button id="retry-btn" class="big-btn">PLAY AGAIN</button>
+        <div class="btn-row">
+          <button id="base-back-btn" class="big-btn coop">BACK TO BASE</button>
+          <button id="retry-btn" class="big-btn">PLAY AGAIN</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="js/config.js"></script>
   <script src="js/audio.js"></script>
+  <script src="js/base.js"></script>
   <script src="js/game.js"></script>
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>
