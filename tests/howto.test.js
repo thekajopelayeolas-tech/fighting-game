@@ -29,6 +29,7 @@ function makeEl(id) {
     },
     closest() { return null; },
     querySelectorAll() { return []; },
+    querySelector() { return { style: {} }; },
   };
 }
 
@@ -38,7 +39,7 @@ test('HOW TO PLAY opens the panel and BACK or Escape closes it', () => {
     'next-wave-btn', 'start-btn', 'start-coop-btn', 'start-pvp-btn', 'retry-btn', 'final-score', 'final-wave', 'final-best',
     'gameover-title', 'final-score-label', 'final-wave-label', 'final-best-label',
     'select', 'select-slots', 'select-grid', 'select-status', 'select-start', 'select-back',
-    'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour', 'track-btn'];
+    'howto', 'howto-btn', 'howto-back', 'bg-choices', 'bg-random', 'base-back-btn', 'pause', 'pause-resume-btn', 'pause-menu-btn', 'shop-armour', 'track-btn', 'touch-joystick', 'touch-fire'];
   const els = {};
   for (const id of ids) els[id] = makeEl(id);
   // The page starts with these overlays hidden; mirror that in the stubs.
@@ -49,7 +50,7 @@ test('HOW TO PLAY opens the panel and BACK or Escape closes it', () => {
   const keyHandlers = [];
   let frameCb = null;
   const sandbox = {
-    document: { getElementById: (id) => els[id] },
+    document: { getElementById: (id) => els[id], body: { classList: { add() {}, remove() {}, toggle() {}, contains() { return false; } } } },
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
     requestAnimationFrame: (cb) => { frameCb = cb; return 1; },
     Image: function () { this.complete = true; this.naturalWidth = 64; this.naturalHeight = 64; },
