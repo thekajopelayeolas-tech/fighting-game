@@ -71,8 +71,8 @@
 
   renderBackgroundChoices();
 
-  // Player 2 controls: arrows move, Right Shift fires, Right Ctrl interacts, Numpad 0 switches weapons.
-  const P2_KEYS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', fire: 'ShiftRight', interact: 'ControlRight', cycle: 'Numpad0' };
+  // Player 2 controls: arrows move, Right Shift fires, M interacts, Numpad 0 switches weapons.
+  const P2_KEYS = { up: 'ArrowUp', down: 'ArrowDown', left: 'ArrowLeft', right: 'ArrowRight', fire: 'ShiftRight', interact: 'KeyM', cycle: 'Numpad0' };
 
   function toCanvas(e) {
     const r = canvas.getBoundingClientRect();
@@ -81,7 +81,7 @@
 
   window.addEventListener('keydown', function (e) {
     keys[e.code] = true;
-    if (e.code === 'KeyM') Sound.toggleMute();
+    if (e.code === 'KeyN') Sound.toggleMute();
     if (!document.getElementById('howto').classList.contains('hidden')) {
       if (e.code === 'Escape' || e.code === 'Enter') document.getElementById('howto').classList.add('hidden');
       return;
@@ -147,6 +147,93 @@
   });
   window.addEventListener('mouseup', function () { mouse.down = false; });
 
+  // Touch: a joystick on the left moves player 1, a fire button on the right shoots, and a tap
+  // on the play area aims and fires. Touch writes into the same state the keyboard and mouse use.
+  // tapFire is set by a tap on the play area and cleared by the next input read, so one tap is one shot.
+  const touch = { moveX: 0, moveY: 0, fire: false, joystickId: null, fireId: null, tapFire: false };
+
+  function touchToCanvas(t) {
+    const r = canvas.getBoundingClientRect();
+    return { x: ((t.clientX - r.left) / r.width) * W, y: ((t.clientY - r.top) / r.height) * H };
+  }
+
+  // The joystick sits in the bottom-left corner of the play area and the fire button bottom-right.
+  // Both are drawn by CSS (see .touch-pad in style.css), and their hit areas match.
+  const joystickEl = document.getElementById('touch-joystick');
+  const fireEl = document.getElementById('touch-fire');
+
+  function setJoystick(clientX, clientY) {
+    const r = joystickEl.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    const max = r.width / 2;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const len = Math.hypot(dx, dy);
+    if (len > max) {
+      dx = (dx / len) * max;
+      dy = (dy / len) * max;
+    }
+    touch.moveX = len < max * 0.2 ? 0 : dx / max;
+    touch.moveY = len < max * 0.2 ? 0 : dy / max;
+    joystickEl.querySelector('.knob').style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  }
+
+  function resetJoystick() {
+    touch.moveX = 0;
+    touch.moveY = 0;
+    joystickEl.querySelector('.knob').style.transform = '';
+  }
+
+  joystickEl.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    touch.joystickId = t.identifier;
+    setJoystick(t.clientX, t.clientY);
+  }, { passive: false });
+  joystickEl.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    for (const t of e.changedTouches) {
+      if (t.identifier === touch.joystickId) setJoystick(t.clientX, t.clientY);
+    }
+  }, { passive: false });
+  const endJoystick = function (e) {
+    for (const t of e.changedTouches) {
+      if (t.identifier === touch.joystickId) {
+        touch.joystickId = null;
+        resetJoystick();
+      }
+    }
+  };
+  joystickEl.addEventListener('touchend', endJoystick);
+  joystickEl.addEventListener('touchcancel', endJoystick);
+
+  fireEl.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    touch.fire = true;
+    touch.fireId = e.changedTouches[0].identifier;
+  }, { passive: false });
+  const endFire = function (e) {
+    for (const t of e.changedTouches) {
+      if (t.identifier === touch.fireId) {
+        touch.fire = false;
+        touch.fireId = null;
+      }
+    }
+  };
+  fireEl.addEventListener('touchend', endFire);
+  fireEl.addEventListener('touchcancel', endFire);
+
+  // A tap on the play area aims at that point and fires once, for quick shots.
+  canvas.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+    const t = e.changedTouches[0];
+    const p = touchToCanvas(t);
+    mouse.x = p.x;
+    mouse.y = p.y;
+    touch.tapFire = true;
+  }, { passive: false });
+
   // Player 1: WASD + mouse aim + Space/click fire + E interact.
   function readP1() {
     let moveX = 0;
@@ -155,7 +242,13 @@
     if (keys.KeyD) moveX += 1;
     if (keys.KeyW) moveY -= 1;
     if (keys.KeyS) moveY += 1;
-    const firing = mouse.down || !!keys.Space;
+    // Touch: the joystick moves player 1 (the keyboard still works alongside it).
+    moveX = Math.max(-1, Math.min(1, moveX + touch.moveX));
+    moveY = Math.max(-1, Math.min(1, moveY + touch.moveY));
+    // A tap on the play area fires one shot; the fire button holds fire while pressed.
+    const tapped = touch.tapFire;
+    touch.tapFire = false;
+    const firing = mouse.down || !!keys.Space || touch.fire || tapped;
     // The special is a one-press action: it is taken once, then cleared.
     const special = pendingSpecial[0];
     pendingSpecial[0] = false;
@@ -193,9 +286,13 @@
   // Shows the Track Down button only while a match is being played, not on the menus.
   function showTrackButton(visible) {
     const btn = document.getElementById('track-btn');
-    if (!btn) return;
-    if (visible) btn.classList.remove('menu-hidden');
-    else btn.classList.add('menu-hidden');
+    if (btn) {
+      if (visible) btn.classList.remove('menu-hidden');
+      else btn.classList.add('menu-hidden');
+    }
+    // The same switch shows the touch controls, which only exist during play.
+    document.body.classList.toggle('playing', !!visible);
+    if (!visible) resetJoystick();
   }
 
   document.getElementById('track-btn').addEventListener('click', function () {
@@ -246,7 +343,7 @@
     return best;
   }
 
-  // Keyboard-held interact keys are one-shot, so E/Right Ctrl only fire on keydown.
+  // Keyboard-held interact keys are one-shot, so E/M only fire on keydown.
   function readInputs() {
     const list = [readP1()];
     if (playerCount === 2) list.push(readP2(run.players[1]));
@@ -561,18 +658,26 @@
   }
 
   // Draws a character's first walking frame from its sheet onto a small canvas.
-  function drawCharacterPreview(canvasEl, assetKey) {
+  // Paints one character card from its sheet. Browsers differ in when a sheet is ready to draw,
+  // and a load event can fire before the card exists. So the card retries on a short timer
+  // until the picture is painted, instead of relying on a single event.
+  function drawCharacterPreview(canvasEl, assetKey, attempt) {
+    const tries = attempt || 0;
     const img = assets[assetKey];
     const c2d = canvasEl.getContext('2d');
     c2d.clearRect(0, 0, canvasEl.width, canvasEl.height);
-    // Sprite sheets load in the background. If this one is not ready yet, the card waits for its
-    // load event and draws itself then, so it never stays blank.
-    if (!img || !img.complete || !img.naturalWidth) {
-      if (img) img.addEventListener('load', function () { drawCharacterPreview(canvasEl, assetKey); }, { once: true });
+    const ready = img && img.complete && img.naturalWidth > 0;
+    if (!ready) {
+      if (tries < 200) setTimeout(function () { drawCharacterPreview(canvasEl, assetKey, tries + 1); }, 50);
       return;
     }
     c2d.imageSmoothingEnabled = false;
-    c2d.drawImage(img, 0, 0, 64, 64, 0, 0, canvasEl.width, canvasEl.height);
+    try {
+      c2d.drawImage(img, 0, 0, 64, 64, 0, 0, canvasEl.width, canvasEl.height);
+    } catch (err) {
+      // A sheet that cannot be drawn yet is retried, the same as one that is still loading.
+      if (tries < 200) setTimeout(function () { drawCharacterPreview(canvasEl, assetKey, tries + 1); }, 50);
+    }
   }
 
   function renderSelect() {
@@ -887,16 +992,23 @@
     return '[' + sp.name + ' ' + key + ': ' + state + ']';
   }
 
+  // The last HUD text written, so the page only updates the HUD when its text changes.
+  let lastHudText = '';
+
   function updateHud() {
     const parts = run.players.map(playerHudText);
+    let text;
     if (run.mode === 'pvp') {
       const wins = run.players.map((p) => p.roundWins).join(' - ');
-      hud.textContent = parts.join('   |   ') + '   |   Round ' + (run.round || 1) +
+      text = parts.join('   |   ') + '   |   Round ' + (run.round || 1) +
         '   Wins ' + wins + '   First to ' + CONFIG.versus.roundsToWin;
-      return;
+    } else {
+      text = parts.join('   |   ') + '   |   Wave ' + run.wave +
+        '   Score ' + Math.floor(run.score) + '   Coins ' + run.coins + '   Best ' + bestScore;
     }
-    hud.textContent = parts.join('   |   ') + '   |   Wave ' + run.wave +
-      '   Score ' + Math.floor(run.score) + '   Coins ' + run.coins + '   Best ' + bestScore;
+    if (text === lastHudText) return;
+    lastHudText = text;
+    hud.textContent = text;
   }
 
   function drawMessage() {
@@ -943,6 +1055,7 @@
     titleEl.classList.remove('hidden');
     showTrackButton(false);
     hud.textContent = '';
+    lastHudText = '';
     Sound.stopMusic();
   }
 

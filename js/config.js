@@ -21,6 +21,8 @@ const CONFIG = {
     knife: 'assets/weapons/knife.png',
     shotgun: 'assets/weapons/shotgun.png',
     redCrab: 'assets/sprites/red_crab.png',
+    roboGuard: 'assets/sprites/robo_guard.png',
+    spikeBall: 'assets/sprites/spike_ball.png',
     brute: 'assets/sprites/space_meteor_large.png',
     coin: 'assets/sprites/spinning_coin.png',
     space: 'assets/backgrounds/space.png',
@@ -73,9 +75,9 @@ const CONFIG = {
     slime: { name: 'Slime', health: 30, speed: 70, damage: 1, radius: 14, color: '#06d6a0', score: 10, xp: 1, sprite: { image: 'redCrab', frames: 5, frameSize: 48 } },
     bat: { name: 'Bat', health: 18, speed: 120, damage: 1, radius: 11, color: '#9d4edd', score: 15, xp: 1, sprite: { image: 'bolt', frames: 9, frameSize: 64 } },
     brute: { name: 'Brute', health: 120, speed: 45, damage: 2, radius: 24, color: '#e63946', score: 40, xp: 3, sprite: { image: 'brute', whole: true, height: 110 } },
-    boss: { name: 'Overlord', health: 900, speed: 55, damage: 2, radius: 46, color: '#ff006e', score: 500, xp: 15, sprite: { image: 'redCrab', frames: 5, frameSize: 48 } },
+    boss: { name: 'Overlord', health: 900, speed: 55, damage: 2, radius: 46, color: '#ff006e', score: 500, xp: 15, sprite: { image: 'roboGuard', frames: 7, frameSize: 48 } },
     // Dasher: fast and fragile. Fast enough to punish standing still.
-    dasher: { name: 'Dasher', health: 14, speed: 185, damage: 1, radius: 10, color: '#ffd166', score: 20, xp: 2, sprite: { image: 'bolt', frames: 9, frameSize: 64, tint: '#ffd166' } },
+    dasher: { name: 'Dasher', health: 14, speed: 185, damage: 1, radius: 10, color: '#ffd166', score: 20, xp: 2, sprite: { image: 'spikeBall', frames: 7, frameSize: 32 } },
     // Armoured: slow and tough. Every hit does less damage to it (armour), so it needs sustained fire.
     armoured: { name: 'Armoured', health: 220, speed: 38, damage: 2, radius: 26, color: '#adb5bd', score: 60, xp: 4, armour: 0.35, sprite: { image: 'brute', whole: true, height: 96 } },
   },

@@ -47,6 +47,55 @@ body {
   pointer-events: none;
 }
 
+/* Touch controls: a joystick (bottom left) and a fire button (bottom right).
+   They are hidden on devices without touch, and only appear while a match is being played. */
+.touch-pad { display: none; position: absolute; z-index: 6; touch-action: none; user-select: none; }
+.touch-joystick {
+  left: 16px;
+  bottom: 16px;
+  width: 130px;
+  height: 130px;
+  border-radius: 50%;
+  background: rgba(7, 11, 22, 0.45);
+  border: 2px solid rgba(76, 201, 240, 0.5);
+}
+.touch-joystick .knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
+  background: rgba(76, 201, 240, 0.7);
+  pointer-events: none;
+}
+.touch-fire {
+  right: 16px;
+  bottom: 16px;
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 77, 109, 0.8);
+  background: rgba(255, 77, 109, 0.55);
+  color: #f1faee;
+  font: inherit;
+  font-weight: bold;
+  font-size: 16px;
+  letter-spacing: 1px;
+}
+/* Shown only on touch devices, and only while playing (the body gets .playing from main.js). */
+@media (hover: none) and (pointer: coarse) {
+  body.playing .touch-pad { display: block; }
+  /* On a touch device the game fills the screen width, so the text and the stations have room. */
+  /* On a phone or tablet the stage keeps the game's 16:9 shape and fills the screen width.
+     The canvas draws the world at its true proportions, so nothing is squashed. */
+  .stage { width: 100vw; border-radius: 0; box-shadow: none; }
+  .hud { font-size: 12px; top: 6px; left: 6px; right: 6px; }
+  .touch-joystick { width: 118px; height: 118px; left: 10px; bottom: 10px; }
+  .touch-fire { width: 92px; height: 92px; right: 10px; bottom: 10px; font-size: 14px; }
+}
+
 /* Track Down button: sits in the play view, bottom left. It pulses while ON so it's easy to see. */
 .track-btn {
   position: absolute;
@@ -67,6 +116,12 @@ body {
 .track-btn:hover { border-color: #ffd166; }
 /* Only shown while playing: hidden on the title, select and game-over screens. */
 .track-btn.menu-hidden { display: none; }
+
+/* Touch devices: Track Down moves to the top right, so it does not sit under the joystick.
+   This comes after the base rules so it wins the cascade. */
+@media (hover: none) and (pointer: coarse) {
+  .track-btn { left: auto; right: 10px; bottom: auto; top: 58px; width: auto; height: auto; font-size: 11px; padding: 6px 10px; }
+}
 .track-btn.on {
   border-color: #ff4d6d;
   background: #ff4d6d;
